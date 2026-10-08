@@ -81,10 +81,17 @@ docker compose -f docker-compose.prod.yml exec postgres pg_dump -U pos pos | gzi
 - **Live screens.** Tills and the kitchen display listen to server-sent events
   (`/api/events`). This is in-memory, so it works for one API instance. Running several needs
   Redis pub/sub in `EventsService`.
+- **Offline billing.** A browser set up as a till (Settings → POS devices) keeps working
+  without internet. Orders, KOTs, bills and payments are saved in the browser (IndexedDB,
+  `apps/web/src/offline`) and every change is queued. When the connection returns the queue is
+  replayed in order through the normal API. Offline orders and bills carry the till's code
+  (`D1-12`, `IND01/26-27/D1-00004`) so they never clash with server numbers. Anything the
+  server refuses shows up as "not synced" on the till. Needs a connection: opening a shift,
+  reopening a bill, voiding after the KOT, credit sales, PIN switching.
 - **Audit.** Voids, discounts, item cancels, price changes, cash in/out and shift closes are
   written to `AuditLog`. Owners see them under Activity.
 
 ## Not built yet
 
-Offline billing, SaaS subscriptions and payments, a platform admin panel, loyalty points,
+Several tills sharing orders while offline (needs a local hub), SaaS subscriptions and payments, a platform admin panel, loyalty points,
 QR ordering, Zomato/Swiggy, and attendance/payroll.

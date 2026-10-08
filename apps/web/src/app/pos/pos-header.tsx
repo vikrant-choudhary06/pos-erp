@@ -3,20 +3,21 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
-import { ChefHat, LayoutDashboard, Lock, LogOut, Wifi, WifiOff } from 'lucide-react';
+import { ChefHat, LayoutDashboard, Lock, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { APP_NAME, LogoMark } from '@/components/logo';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { forgetSession } from '@/offline/cache';
+import { SyncStatus } from './sync-status';
 
 export function PosHeader({ onHome }: { onHome: () => void }) {
   const { me, outletId, can } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const online = useOnline();
   const ref = useRef<HTMLDivElement>(null);
   const outlet = me.outlets.find((o) => o.id === outletId);
 
@@ -30,6 +31,7 @@ export function PosHeader({ onHome }: { onHome: () => void }) {
   // ending the session sends shared tills back to the PIN screen
   async function signOut() {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
+    await forgetSession();
     queryClient.clear();
     router.replace('/lock');
   }
@@ -43,11 +45,7 @@ export function PosHeader({ onHome }: { onHome: () => void }) {
       <span className="hidden text-[13px] text-ink-soft sm:block">{outlet?.name}</span>
 
       <div className="ml-auto flex items-center gap-1">
-        {!online && (
-          <span className="mr-2 inline-flex items-center gap-1.5 rounded-md bg-danger/[0.08] px-2 py-1 text-xs text-danger">
-            <WifiOff className="size-3.5" /> Offline
-          </span>
-        )}
+        <SyncStatus />
         {can('kitchen.view') && (
           <Link
             href="/kitchen"
@@ -93,6 +91,7 @@ export function PosHeader({ onHome }: { onHome: () => void }) {
                 <button
                   onClick={async () => {
                     await api('/auth/logout', { method: 'POST' }).catch(() => {});
+                    await forgetSession();
                     queryClient.clear();
                     router.replace('/login');
                   }}
@@ -115,7 +114,7 @@ function MenuLink({
   children,
 }: {
   href: string;
-  icon: typeof Wifi;
+  icon: typeof Lock;
   children: React.ReactNode;
 }) {
   return (
@@ -126,20 +125,4 @@ function MenuLink({
       <Icon className="size-4 text-ink-faint" /> {children}
     </Link>
   );
-}
-
-function useOnline() {
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
-  return online;
 }

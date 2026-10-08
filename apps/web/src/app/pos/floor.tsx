@@ -7,12 +7,11 @@ import { Bike, Plus, ShoppingBag, Store, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Tabs } from '@/components/ui/tabs';
-import { api, errorMessage } from '@/lib/api';
+import { errorMessage } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { newId } from '@/lib/id';
 import type { Order, PosMenu } from '@/lib/pos-types';
-import { useSession } from '@/lib/session';
-import { elapsed, useActiveOrders, useOrderCache } from './use-pos';
+import { usePosActions } from './actions';
+import { elapsed, useActiveOrders } from './use-pos';
 
 const ALL = 'all';
 
@@ -23,9 +22,8 @@ const QUICK: { type: OrderType; icon: typeof Store }[] = [
 ];
 
 export function Floor({ menu, onOpen }: { menu: PosMenu; onOpen: (id: string) => void }) {
-  const { outletId } = useSession();
   const orders = useActiveOrders();
-  const cache = useOrderCache();
+  const actions = usePosActions(menu);
   const [area, setArea] = useState(ALL);
   const now = useNow();
 
@@ -39,12 +37,8 @@ export function Floor({ menu, onOpen }: { menu: PosMenu; onOpen: (id: string) =>
   const tables = menu.tables.filter((t) => area === ALL || t.areaId === area);
 
   const create = useMutation({
-    mutationFn: (body: { type: OrderType; tableId?: string }) =>
-      api<Order>('/orders', { method: 'POST', body: { id: newId(), outletId, ...body } }),
-    onSuccess: (order) => {
-      cache(order);
-      onOpen(order.id);
-    },
+    mutationFn: (body: { type: OrderType; tableId?: string }) => actions.createOrder(body),
+    onSuccess: (order) => onOpen(order.id),
     onError: (err) => toast.error(errorMessage(err)),
   });
 

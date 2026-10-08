@@ -11,6 +11,7 @@ import { OrderScreen } from './order-screen';
 import { PosHeader } from './pos-header';
 import { ShiftBanner } from './shift';
 import { usePosMenu } from './use-pos';
+import { useOfflineSync } from '@/offline/use-offline-sync';
 
 export default function PosPage() {
   const { outletId, can } = useSession();
@@ -18,6 +19,7 @@ export default function PosPage() {
   const menu = usePosMenu();
 
   useLive(outletId);
+  useOfflineSync(menu.data);
 
   if (!outletId) {
     return (

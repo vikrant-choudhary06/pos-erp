@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { api, errorMessage } from '@/lib/api';
+import { errorMessage } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { newId } from '@/lib/id';
 import type { Order } from '@/lib/pos-types';
@@ -22,6 +22,7 @@ export function PayDialog({
   total,
   open,
   onClose,
+  onPay,
   onPaid,
 }: {
   order: Order;
@@ -29,6 +30,9 @@ export function PayDialog({
   total: number;
   open: boolean;
   onClose: () => void;
+  onPay: (
+    payments: { id: string; method: PaymentMethod; amount: number; reference?: string }[],
+  ) => Promise<{ order: Order; change: number }>;
   onPaid: (order: Order, change: number, print: boolean) => void;
 }) {
   const due = Math.round((total - Number(order.paidTotal)) * 100) / 100;
@@ -57,19 +61,16 @@ export function PayDialog({
   async function submit() {
     setBusy(true);
     try {
-      const res = await api<{ order: Order; change: number }>(`/orders/${order.id}/payments`, {
-        method: 'POST',
-        body: {
-          payments: rows
-            .filter((r) => Number(r.amount) > 0)
-            .map((r) => ({
-              id: r.id,
-              method: r.method,
-              amount: Number(r.amount),
-              reference: r.reference || undefined,
-            })),
-        },
-      });
+      const res = await onPay(
+        rows
+          .filter((r) => Number(r.amount) > 0)
+          .map((r) => ({
+            id: r.id,
+            method: r.method,
+            amount: Number(r.amount),
+            reference: r.reference || undefined,
+          })),
+      );
       onPaid(res.order, res.change, print);
     } catch (err) {
       toast.error(errorMessage(err));

@@ -6,6 +6,7 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsISO8601,
   IsNumber,
   IsOptional,
   IsString,
@@ -26,6 +27,15 @@ export class CreateOrderDto {
   @IsOptional()
   @IsUUID()
   id?: string;
+
+  /** set by a till for orders taken offline, e.g. "D1-14" */
+  @IsOptional()
+  @Matches(/^D\d{1,3}-\d{1,6}$/)
+  orderNo?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  openedAt?: string;
 
   @IsUUID()
   outletId: string;
@@ -200,6 +210,17 @@ export class PaymentDto {
   reference?: string;
 }
 
+export class BillDto {
+  /** set by a till for bills printed offline, e.g. "IND01/26-27/D1-00012" */
+  @IsOptional()
+  @Matches(/^[A-Z0-9]{2,10}\/\d{2}-\d{2}\/D\d{1,3}-\d{5,}$/)
+  invoiceNo?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  issuedAt?: string;
+}
+
 export class PayDto {
   // empty is allowed for bills that come to zero after a discount
   @IsArray()
@@ -207,6 +228,10 @@ export class PayDto {
   @ValidateNested({ each: true })
   @Type(() => PaymentDto)
   payments: PaymentDto[];
+
+  @IsOptional()
+  @IsISO8601()
+  paidAt?: string;
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

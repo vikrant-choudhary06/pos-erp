@@ -43,15 +43,21 @@ export class SessionsService {
     return { token, expiresAt };
   }
 
-  async resolve(token: string): Promise<AuthUser | null> {
+  /**
+   * deviceToken is the till cookie: someone signed in by email on a registered
+   * till still counts as working on that till.
+   */
+  async resolve(token: string, deviceToken?: string): Promise<AuthUser | null> {
     const session = await this.prisma.session.findUnique({
       where: { tokenHash: sha256(token) },
       include: {
         user: { include: { role: true, tenant: true, outlets: { select: { outletId: true } } } },
+        device: { select: { id: true, code: true, status: true } },
       },
     });
 
     if (!session || session.revokedAt || session.expiresAt < new Date()) return null;
+    if (session.device && session.device.status !== 'ACTIVE') return null;
 
     const { user } = session;
     if (user.status !== 'ACTIVE' || user.deletedAt) return null;
@@ -76,7 +82,24 @@ export class SessionsService {
       isOwner: user.isOwner,
       permissions: user.role.permissions,
       outletIds: user.isOwner || user.allOutlets ? null : user.outlets.map((o) => o.outletId),
+      ...(await this.tillFor(user.tenantId, session.device, deviceToken)),
     };
+  }
+
+  private async tillFor(
+    tenantId: string,
+    sessionDevice: { id: string; code: string } | null,
+    deviceToken?: string,
+  ) {
+    let device = sessionDevice;
+    if (!device && deviceToken) {
+      const found = await this.prisma.device.findUnique({
+        where: { tokenHash: sha256(deviceToken) },
+        select: { id: true, code: true, status: true, tenantId: true },
+      });
+      if (found?.status === 'ACTIVE' && found.tenantId === tenantId) device = found;
+    }
+    return { deviceId: device?.id ?? null, deviceCode: device?.code ?? null };
   }
 
   revoke(sessionId: string) {

@@ -18,12 +18,14 @@ import { AuthUser } from '../auth/decorators';
 import { BusinessService } from '../business/business.service';
 import { canAccessOutlet } from '../common/access';
 import { nextNumber } from '../common/counters';
+import { clientTime, requireDevicePrefix } from '../common/offline';
 import { requirePermission } from '../common/permissions';
 import { EventsService } from '../events/events.service';
 import { StockService } from '../inventory/stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AddItemsDto,
+  BillDto,
   CreateOrderDto,
   DiscountDto,
   PayDto,
@@ -153,14 +155,17 @@ export class OrdersService {
       throw new BadRequestException('Pick a table for a dine-in order');
     }
 
+    if (dto.orderNo) requireDevicePrefix(user, dto.orderNo, (code) => `${code}-`);
+
     const customerId = dto.customerPhone
       ? await this.upsertCustomer(user.tenantId, dto.customerPhone, dto.customerName)
       : undefined;
-    const date = businessDate(new Date(), outlet.timezone, outlet.dayStartTime);
+    const openedAt = clientTime(dto.openedAt);
+    const date = businessDate(openedAt, outlet.timezone, outlet.dayStartTime);
 
     const order = await this.prisma.$transaction(async (tx) => {
       if (dto.tableId) await this.claimTable(tx, outlet.id, dto.tableId);
-      const number = await nextNumber(tx, outlet.id, `order:${date}`);
+      const orderNo = dto.orderNo ?? String(await nextNumber(tx, outlet.id, `order:${date}`));
 
       return tx.order.create({
         data: {
@@ -168,7 +173,8 @@ export class OrdersService {
           tenantId: user.tenantId,
           outletId: outlet.id,
           businessDate: new Date(date),
-          orderNo: String(number),
+          orderNo,
+          openedAt,
           type: dto.type,
           tableId: dto.type === 'DINE_IN' ? dto.tableId : null,
           covers: dto.covers,
@@ -464,7 +470,7 @@ export class OrdersService {
 
   // ---- billing ---------------------------------------------------------------
 
-  async bill(user: AuthUser, id: string) {
+  async bill(user: AuthUser, id: string, offline: BillDto = {}) {
     const order = await this.loadActive(user, id);
     if (order.status === 'BILLED') return this.get(user, id);
 
@@ -481,7 +487,17 @@ export class OrdersService {
       const bill = await this.recalculate(tx, id);
       const date = isoDate(order.businessDate);
       const fy = financialYear(date);
-      const number = await nextNumber(tx, outlet.id, `invoice:${fy}`);
+      if (offline.invoiceNo) {
+        requireDevicePrefix(
+          user,
+          offline.invoiceNo,
+          (code) => `${outlet.code}/${fy.slice(2)}/${code}-`,
+        );
+      }
+      const invoiceNo =
+        offline.invoiceNo ??
+        `${outlet.code}/${fy.slice(2)}/${String(await nextNumber(tx, outlet.id, `invoice:${fy}`)).padStart(5, '0')}`;
+      const issuedAt = clientTime(offline.issuedAt);
       const customer = order.customerId
         ? await tx.customer.findUnique({ where: { id: order.customerId } })
         : null;
@@ -491,8 +507,9 @@ export class OrdersService {
           tenantId: user.tenantId,
           outletId: outlet.id,
           orderId: id,
-          invoiceNo: `${outlet.code}/${fy.slice(2)}/${String(number).padStart(5, '0')}`,
-          series: 'MAIN',
+          invoiceNo,
+          series: offline.invoiceNo ? user.deviceCode! : 'MAIN',
+          issuedAt,
           financialYear: fy,
           businessDate: order.businessDate,
           customerName: order.customerName ?? customer?.name,
@@ -517,7 +534,7 @@ export class OrdersService {
         },
       });
 
-      await tx.order.update({ where: { id }, data: { status: 'BILLED', billedAt: new Date() } });
+      await tx.order.update({ where: { id }, data: { status: 'BILLED', billedAt: issuedAt } });
       if (order.tableId) {
         await tx.diningTable.update({ where: { id: order.tableId }, data: { status: 'BILLED' } });
       }
@@ -611,6 +628,7 @@ export class OrdersService {
     const paidNow = toSave.reduce((sum, p) => sum + p.paise, 0);
     if (!paidNow && due > 0) throw new BadRequestException('Add a payment');
     const settled = paidNow >= due;
+    const paidAt = clientTime(dto.paidAt);
     const invoice = await this.prisma.invoice.findFirst({
       where: { orderId: id, status: 'ISSUED' },
     });
@@ -630,6 +648,7 @@ export class OrdersService {
             tipAmount: i === 0 ? (dto.tip ?? 0) : 0,
             reference: p.reference,
             receivedById: user.userId,
+            paidAt,
           },
         });
         if (p.method === 'CREDIT') {
@@ -644,7 +663,7 @@ export class OrdersService {
         where: { id },
         data: {
           paidTotal: { increment: paidNow / 100 },
-          ...(settled && { status: 'PAID', closedAt: new Date() }),
+          ...(settled && { status: 'PAID', closedAt: paidAt }),
         },
       });
 

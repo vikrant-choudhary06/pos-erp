@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { api } from './api';
+import { cachedApi } from '@/offline/cache';
 import { useSession } from './session';
 import type { Business, Outlet } from './types';
 
@@ -10,12 +10,12 @@ export function useBillHeader() {
   const { outletId, me } = useSession();
   const outlets = useQuery({
     queryKey: ['outlets'],
-    queryFn: () => api<Outlet[]>('/outlets'),
+    queryFn: () => cachedApi<Outlet[]>('outlets', '/outlets'),
     staleTime: 10 * 60_000,
   });
   const business = useQuery({
     queryKey: ['business'],
-    queryFn: () => api<Business>('/business'),
+    queryFn: () => cachedApi<Business>('business', '/business'),
     staleTime: 10 * 60_000,
   });
   const outlet = outlets.data?.find((o) => o.id === outletId);

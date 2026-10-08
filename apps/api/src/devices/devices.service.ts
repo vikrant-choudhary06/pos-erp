@@ -154,4 +154,48 @@ export class DevicesService {
     const session = await this.sessions.create(user, meta, device.id, 1);
     return { ...session, outletId: device.outletId };
   }
+
+  /**
+   * The till this session is on, and the last numbers it used, so it can keep
+   * counting offline without clashing with what the server already has.
+   */
+  async numbering(user: AuthUser, date: string, fy: string) {
+    if (!user.deviceId) return null;
+    const device = await this.prisma.device.findUnique({
+      where: { id: user.deviceId },
+      include: { outlet: { select: { id: true, code: true } } },
+    });
+    if (!device) return null;
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        outletId: device.outletId,
+        businessDate: new Date(date),
+        orderNo: { startsWith: `${device.code}-` },
+      },
+      select: { orderNo: true },
+    });
+    const invoicePrefix = `${device.outlet.code}/${fy.slice(2)}/${device.code}-`;
+    const invoices = await this.prisma.invoice.findMany({
+      where: { outletId: device.outletId, invoiceNo: { startsWith: invoicePrefix } },
+      select: { invoiceNo: true },
+    });
+    const last = (values: string[], prefix: string) =>
+      Math.max(0, ...values.map((v) => Number(v.slice(prefix.length)) || 0));
+
+    return {
+      id: device.id,
+      code: device.code,
+      outletId: device.outletId,
+      outletCode: device.outlet.code,
+      lastOrder: last(
+        orders.map((o) => o.orderNo),
+        `${device.code}-`,
+      ),
+      lastInvoice: last(
+        invoices.map((i) => i.invoiceNo),
+        invoicePrefix,
+      ),
+    };
+  }
 }

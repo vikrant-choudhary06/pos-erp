@@ -26,6 +26,8 @@ export type PosMenu = {
     id: string;
     name: string;
     code: string;
+    timezone: string;
+    dayStartTime: string;
     priceIncludesTax: boolean;
     settings: OutletSettings;
   };
