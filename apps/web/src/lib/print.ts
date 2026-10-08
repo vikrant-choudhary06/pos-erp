@@ -31,16 +31,16 @@ const STYLE = `
 type Desktop = { print(html: string, kind: 'bill' | 'kot'): Promise<void> };
 
 /**
- * Prints a receipt. In the Counter desktop app it goes straight to the bill
+ * Prints a receipt. In the Rizzoto desktop app it goes straight to the bill
  * or kitchen printer; in a browser it opens the print dialog.
  */
 export function printHtml(body: string, kind: 'bill' | 'kot' = 'bill') {
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${STYLE}</style></head><body>${body}</body></html>`;
-  const desktop = (window as { counterDesktop?: Desktop }).counterDesktop;
+  const desktop = (window as { rizzotoDesktop?: Desktop }).rizzotoDesktop;
   if (desktop) {
     desktop.print(html, kind).catch(() => {
       toast.error(kind === 'kot' ? 'KOT did not print' : 'Bill did not print', {
-        description: 'Check the printer in Counter POS settings',
+        description: 'Check the printer in Rizzoto settings',
       });
     });
     return;

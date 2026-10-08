@@ -32,7 +32,7 @@ export function saveConfig(config: Config) {
   fs.writeFileSync(file(), JSON.stringify(config, null, 2));
 }
 
-/** "counter.example.com" -> "https://counter.example.com", without a trailing slash. */
+/** "pos.example.com" -> "https://pos.example.com", without a trailing slash. */
 export function cleanUrl(input: string) {
   const value = input.trim();
   if (!value) return '';

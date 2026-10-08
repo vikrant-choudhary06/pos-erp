@@ -1,6 +1,6 @@
-appId: in.counter.pos
-productName: Counter POS
-copyright: Counter
+appId: in.rizzoto.pos
+productName: Rizzoto
+copyright: Rizzoto
 directories:
   output: release
 files:
@@ -14,10 +14,10 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: Counter-POS-Setup-${version}.${ext}
+  artifactName: Rizzoto-Setup-${version}.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
-  shortcutName: Counter POS
+  shortcutName: Rizzoto

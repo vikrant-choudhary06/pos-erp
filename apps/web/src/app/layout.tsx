@@ -5,7 +5,7 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Counter', template: '%s · Counter' },
+  title: { default: 'Rizzoto', template: '%s · Rizzoto' },
   description: 'Billing, menu, tables and staff for restaurants and cafes.',
   icons: { icon: '/favicon.svg' },
 };

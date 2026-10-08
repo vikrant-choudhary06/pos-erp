@@ -17,7 +17,7 @@ let dataDir: string;
 let base: string;
 
 test.beforeAll(async () => {
-  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'counter-hub-'));
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rizzoto-hub-'));
   hub = await startHub({ cloudUrl: CLOUD, dataDir, port: 0, host: '127.0.0.1' });
   base = `http://localhost:${hub.port}`;
 });
@@ -66,7 +66,7 @@ async function setUpCafe(request: APIRequestContext) {
   });
   await request.post('/api/shifts', { data: { outletId, openingCash: 500 } });
   // registered through the hub, so the hub becomes till D1
-  const device = await request.post('/api/devices', { data: { outletId, name: 'Counter PC' } });
+  const device = await request.post('/api/devices', { data: { outletId, name: 'Front PC' } });
   expect(device.ok()).toBeTruthy();
   return { email, outletId };
 }
