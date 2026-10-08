@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 
@@ -33,7 +33,8 @@ export class MailService {
 
     if (error) {
       this.logger.error(`Could not send login code to ${to}: ${error.message}`);
-      throw new Error('Email could not be sent');
+      // the reason (unverified domain, bad sender, wrong key) is what the owner needs to fix it
+      throw new ServiceUnavailableException(`Login email could not be sent: ${error.message}`);
     }
   }
 }
