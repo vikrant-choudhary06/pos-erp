@@ -70,7 +70,7 @@ jobs:
       - run: pnpm e2e
         env:
           CI: "true"
-      - name: Counter hub, offline across tablets
+      - name: Rizzoto hub, offline across tablets
         run: pnpm --filter window test
         env:
           CI: "true"

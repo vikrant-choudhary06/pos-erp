@@ -1,4 +1,4 @@
-# Counter
+# Rizzoto
 
 Multi-tenant POS for restaurants, cafes and cloud kitchens: billing, KOTs, kitchen display,
 menu, tables, stock, purchases, staff and reports.
@@ -44,9 +44,9 @@ pnpm e2e              # browser test: sign up -> menu -> POS order -> kitchen ->
 the dev server compiles each page on first visit. CI (`.github/workflows/ci.yml`) runs all
 three on every push against production builds.
 
-## Counter PC app (Windows)
+## Rizzoto for Windows (counter PC)
 
-`window/` builds the installer `Counter-POS-Setup-<version>.exe`. Install it on the PC at the billing counter. On first
+`window/` builds the installer `Rizzoto-Setup-<version>.exe`. Install it on the PC at the billing counter. On first
 start it asks for the web address of the account, then opens the POS full screen. It also runs
 a small server (the hub) on port 7400 that the shop's tablets and the kitchen screen use
 instead of the website: settings show the address to open, e.g. `http://192.168.1.20:7400/pos`.

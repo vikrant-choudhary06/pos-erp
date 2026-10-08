@@ -1,13 +1,21 @@
 import Link from 'next/link';
 import { cn } from '@/lib/cn';
 
-export const APP_NAME = 'Counter';
+export const APP_NAME = 'Rizzoto';
 
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={cn('size-6', className)} aria-hidden>
       <rect width="24" height="24" rx="7" className="fill-ink" />
-      <path d="M7 8.5h10M7 12h10M7 15.5h6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+      {/* a lowercase "r." */}
+      <path
+        d="M9 17v-5.5A3.5 3.5 0 0 1 12.5 8H14"
+        fill="none"
+        stroke="white"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <circle cx="16" cy="16.2" r="1.3" fill="white" />
     </svg>
   );
 }

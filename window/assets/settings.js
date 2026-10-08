@@ -38,7 +38,7 @@ function showStatus(status) {
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
     dismiss.textContent = 'Dismiss';
-    dismiss.onclick = () => window.counter.dismiss(f.seq);
+    dismiss.onclick = () => window.rizzoto.dismiss(f.seq);
     li.append(text, dismiss);
     failed.append(li);
   }
@@ -48,11 +48,11 @@ const cleanError = (err) =>
   String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
 async function init() {
-  const { config, status } = await window.counter.load();
+  const { config, status } = await window.rizzoto.load();
   form.cloudUrl.value = config.cloudUrl;
   form.port.value = config.port;
   form.startWithWindows.checked = config.startWithWindows;
-  const printers = await window.counter.printers().catch(() => []);
+  const printers = await window.rizzoto.printers().catch(() => []);
   fill(form.billPrinter, printers, config.billPrinter);
   fill(form.kotPrinter, printers, config.kotPrinter);
   if (!config.cloudUrl) document.getElementById('save').textContent = 'Save and open POS';
@@ -65,7 +65,7 @@ form.addEventListener('submit', async (event) => {
   const save = document.getElementById('save');
   save.disabled = true;
   try {
-    const status = await window.counter.save({
+    const status = await window.rizzoto.save({
       cloudUrl: form.cloudUrl.value,
       port: Number(form.port.value),
       billPrinter: form.billPrinter.value,
@@ -86,7 +86,7 @@ for (const button of document.querySelectorAll('[data-test]')) {
   button.addEventListener('click', async () => {
     errorBox.textContent = '';
     try {
-      await window.counter.testPrint(button.dataset.test);
+      await window.rizzoto.testPrint(button.dataset.test);
     } catch {
       errorBox.textContent = 'Could not print. Check the printer is on and connected.';
     }
@@ -95,9 +95,9 @@ for (const button of document.querySelectorAll('[data-test]')) {
 
 document.getElementById('sync').addEventListener('click', async (event) => {
   event.target.disabled = true;
-  showStatus(await window.counter.syncNow());
+  showStatus(await window.rizzoto.syncNow());
   event.target.disabled = false;
 });
 
-window.counter.onStatus(showStatus);
+window.rizzoto.onStatus(showStatus);
 init();

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld('counter', {
+contextBridge.exposeInMainWorld('rizzoto', {
   load: () => ipcRenderer.invoke('settings:load'),
   save: (config: unknown) => ipcRenderer.invoke('settings:save', config),
   printers: () => ipcRenderer.invoke('settings:printers'),

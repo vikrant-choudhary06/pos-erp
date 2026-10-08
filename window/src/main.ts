@@ -53,7 +53,7 @@ async function runHub() {
   } catch (err) {
     const busy = (err as NodeJS.ErrnoException).code === 'EADDRINUSE';
     dialog.showErrorBox(
-      'Counter POS',
+      'Rizzoto',
       busy
         ? `Port ${config.port} is already in use. Pick another port in Settings.`
         : `The local hub could not start: ${(err as Error).message}`,
@@ -71,8 +71,8 @@ function showStatus(status: HubStatus) {
       : status.mode === 'syncing'
         ? `Syncing ${status.pending}`
         : `Offline${status.pending ? `, ${status.pending} to sync` : ''}`;
-  tray?.setToolTip(`Counter POS: ${label}`);
-  main?.setTitle(`Counter POS (${label})`);
+  tray?.setToolTip(`Rizzoto: ${label}`);
+  main?.setTitle(`Rizzoto (${label})`);
   settings?.webContents.send('hub:status', status);
 }
 
@@ -89,7 +89,7 @@ function showMain() {
     width: 1280,
     height: 800,
     show: false,
-    title: 'Counter POS',
+    title: 'Rizzoto',
     icon: path.join(assets, 'icon.png'),
     autoHideMenuBar: true,
     backgroundColor: '#ffffff',
@@ -145,7 +145,7 @@ function openSettings() {
     height: 680,
     resizable: false,
     minimizable: false,
-    title: 'Counter POS settings',
+    title: 'Rizzoto settings',
     icon: path.join(assets, 'icon.png'),
     autoHideMenuBar: true,
     parent: main?.isVisible() ? main : undefined,
@@ -164,7 +164,7 @@ function openSettings() {
 
 function createTray() {
   tray = new Tray(path.join(assets, 'tray.png'));
-  tray.setToolTip('Counter POS');
+  tray.setToolTip('Rizzoto');
   tray.on('click', showMain);
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -218,7 +218,7 @@ ipcMain.handle('settings:printers', async () => {
 
 ipcMain.handle('settings:test-print', async (_e, kind: 'bill' | 'kot') => {
   const html = `<div style="font:13px monospace;width:70mm;text-align:center;padding:4mm 0">
-    Counter POS<br>${kind === 'kot' ? 'Kitchen' : 'Bill'} printer works<br>${new Date().toLocaleString('en-IN')}</div>`;
+    Rizzoto<br>${kind === 'kot' ? 'Kitchen' : 'Bill'} printer works<br>${new Date().toLocaleString('en-IN')}</div>`;
   await printSilently(html, kind === 'kot' ? config.kotPrinter : config.billPrinter);
 });
 
@@ -229,7 +229,7 @@ ipcMain.handle('settings:save', async (_e, input: Partial<Config>) => {
     cloudUrl: cleanUrl(input.cloudUrl ?? config.cloudUrl),
     port: Number(input.port) || config.port,
   };
-  if (!next.cloudUrl) throw new Error('Enter the web address of your Counter account');
+  if (!next.cloudUrl) throw new Error('Enter the web address of your Rizzoto account');
 
   const restart = !hub || next.cloudUrl !== config.cloudUrl || next.port !== config.port;
   config = next;
