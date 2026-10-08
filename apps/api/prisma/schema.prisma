@@ -1,0 +1,1357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// enums
+
+enum BusinessType {
+  RESTAURANT
+  CAFE
+  QSR
+  BAR
+  CLOUD_KITCHEN
+  BAKERY
+  HOTEL_RESTAURANT
+  OTHER
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum PrinterConnection {
+  NETWORK
+  USB
+  BLUETOOTH
+}
+
+enum PaperWidth {
+  MM_58
+  MM_80
+}
+
+enum FoodType {
+  VEG
+  NON_VEG
+  EGG
+}
+
+enum MenuItemType {
+  SINGLE
+  COMBO
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  COUNTER
+}
+
+enum OrderStatus {
+  OPEN
+  BILLED
+  PAID
+  VOID
+}
+
+enum OrderItemStatus {
+  PENDING
+  SENT
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum KotStatus {
+  NEW
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  BILLED
+  RESERVED
+  BLOCKED
+}
+
+enum InvoiceStatus {
+  ISSUED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  WALLET
+  CREDIT
+  OTHER
+}
+
+enum PaymentStatus {
+  SUCCESS
+  REFUNDED
+}
+
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+enum DiscountScope {
+  ORDER
+  ITEM
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashMovementType {
+  PAY_IN
+  PAY_OUT
+}
+
+enum LoyaltyTxnType {
+  EARN
+  REDEEM
+  ADJUST
+  EXPIRE
+}
+
+enum BaseUnit {
+  G
+  ML
+  PCS
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  PURCHASE_RETURN
+  SALE
+  SALE_REVERSAL
+  WASTAGE
+  ADJUSTMENT // stock count variance
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum StockCountStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum TransferStatus {
+  DRAFT
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+// platform
+
+model PlatformAdmin {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  name         String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Plan {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  code         String   @unique // BASIC, PRO, ENTERPRISE
+  name         String
+  priceMonthly Decimal  @db.Decimal(12, 2)
+  priceYearly  Decimal  @db.Decimal(12, 2)
+  maxOutlets   Int
+  maxUsers     Int
+  maxDevices   Int
+  features     String[]
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Tenant {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  name         String
+  businessCode String       @unique // staff login: Business Code + Employee ID
+  businessType BusinessType
+  status       TenantStatus @default(TRIAL)
+  legalName    String?
+  gstin        String?
+  email        String
+  phone        String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  outlets       Outlet[]
+  roles         Role[]
+  users         User[]
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  tenantId           String             @db.Uuid
+  planId             String             @db.Uuid
+  status             SubscriptionStatus
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelledAt        DateTime?
+  externalRef        String? // Razorpay subscription id
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+}
+
+// tenant / outlet
+
+model Outlet {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @db.Uuid
+  name             String
+  code             String // short code, e.g. "AND01"
+  phone            String?
+  email            String?
+  addressLine      String?
+  city             String?
+  state            String?
+  stateCode        String? // GST state code (place of supply)
+  pincode          String?
+  gstin            String?
+  fssaiNo          String?
+  timezone         String    @default("Asia/Kolkata")
+  currency         String    @default("INR")
+  priceIncludesTax Boolean   @default(false)
+  dayStartTime     String    @default("05:00")
+  invoicePrefix    String?
+  settings         Json      @default("{}") // service charge %, bill footer, rounding, etc.
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  userOutlets UserOutlet[]
+  devices     Device[]
+  printers    Printer[]
+  stations    KitchenStation[]
+  floorAreas  FloorArea[]
+  tables      DiningTable[]
+  menuItems   OutletMenuItem[]
+  prices      MenuItemPrice[]
+  orders      Order[]
+  shifts      Shift[]
+  stocks      OutletStock[]
+
+  @@unique([tenantId, code])
+}
+
+// iam
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String // Owner, Manager, Cashier, Waiter, Chef, custom...
+  description String?
+  permissions String[] // codes from packages/shared: "order.create", "bill.void", ...
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  users  User[]
+
+  @@unique([tenantId, name])
+}
+
+// Owners and staff both live here. Owners sign in with email + OTP,
+// staff with business code + employee code + password (or PIN on a POS device).
+model User {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  tenantId     String     @db.Uuid
+  roleId       String     @db.Uuid
+  employeeCode String
+  name         String
+  email        String?
+  phone        String?
+  passwordHash String?
+  pinHash      String?
+  pinFailures  Int        @default(0)
+  pinLockedAt  DateTime?
+  isOwner      Boolean    @default(false)
+  allOutlets   Boolean    @default(false)
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  role     Role         @relation(fields: [roleId], references: [id])
+  outlets  UserOutlet[]
+  sessions Session[]
+
+  @@unique([tenantId, employeeCode])
+  @@unique([email])
+}
+
+model UserOutlet {
+  tenantId String @db.Uuid
+  userId   String @db.Uuid
+  outletId String @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id])
+  outlet Outlet @relation(fields: [outletId], references: [id])
+
+  @@id([userId, outletId])
+  @@index([tenantId])
+}
+
+model Device {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  tenantId   String       @db.Uuid
+  outletId   String       @db.Uuid
+  name       String // "Counter 1", "Kitchen Tablet"
+  code       String
+  tokenHash  String       @unique
+  status     DeviceStatus @default(ACTIVE)
+  lastSeenAt DateTime?
+  lastSyncAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  outlet   Outlet    @relation(fields: [outletId], references: [id])
+  sessions Session[]
+
+  @@unique([outletId, code])
+  @@index([tenantId])
+}
+
+model Session {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @db.Uuid
+  userId     String    @db.Uuid
+  deviceId   String?   @db.Uuid
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  device Device? @relation(fields: [deviceId], references: [id])
+
+  @@index([userId])
+}
+
+model OtpCode {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  email           String
+  codeHash        String
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  verifiedAt      DateTime?
+  // set when the email has no account yet; exchanged during onboarding
+  signupTokenHash String?   @unique
+  createdAt       DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+// printers & kitchen stations
+
+model Printer {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  tenantId      String            @db.Uuid
+  outletId      String            @db.Uuid
+  name          String
+  connection    PrinterConnection
+  address       String? // IP:port / USB path / BT MAC
+  paperWidth    PaperWidth        @default(MM_80)
+  isBillPrinter Boolean           @default(false)
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  outlet   Outlet           @relation(fields: [outletId], references: [id])
+  stations KitchenStation[]
+
+  @@index([tenantId])
+}
+
+model KitchenStation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @db.Uuid
+  outletId  String   @db.Uuid
+  name      String // "Main Kitchen", "Tandoor", "Bar"
+  printerId String?  @db.Uuid
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  outlet    Outlet           @relation(fields: [outletId], references: [id])
+  printer   Printer?         @relation(fields: [printerId], references: [id])
+  menuItems OutletMenuItem[]
+  kots      Kot[]
+
+  @@unique([outletId, name])
+  @@index([tenantId])
+}
+
+// tax
+
+// e.g. "GST 5%" -> CGST 2.5 + SGST 2.5
+model TaxGroup {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  components TaxComponent[]
+  menuItems  MenuItem[]
+
+  @@unique([tenantId, name])
+}
+
+model TaxComponent {
+  id         String  @id @default(uuid(7)) @db.Uuid
+  tenantId   String  @db.Uuid
+  taxGroupId String  @db.Uuid
+  name       String // CGST, SGST, IGST, VAT, CESS
+  rate       Decimal @db.Decimal(5, 2)
+  sortOrder  Int     @default(0)
+
+  taxGroup TaxGroup @relation(fields: [taxGroupId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+// menu
+
+model MenuCategory {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @db.Uuid
+  parentId  String?   @db.Uuid
+  name      String
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  parent   MenuCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children MenuCategory[] @relation("CategoryTree")
+  items    MenuItem[]
+
+  @@index([tenantId])
+}
+
+// Menu is shared across outlets; per-outlet availability and pricing live in
+// OutletMenuItem and MenuItemPrice.
+model MenuItem {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  tenantId    String       @db.Uuid
+  categoryId  String       @db.Uuid
+  type        MenuItemType @default(SINGLE)
+  name        String
+  shortCode   String? // fast billing: "PBM" = Paneer Butter Masala
+  description String?
+  foodType    FoodType
+  imageUrl    String?
+  hsnCode     String?
+  taxGroupId  String?      @db.Uuid
+  basePrice   Decimal      @db.Decimal(12, 2)
+  hasVariants Boolean      @default(false)
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  category        MenuCategory            @relation(fields: [categoryId], references: [id])
+  taxGroup        TaxGroup?               @relation(fields: [taxGroupId], references: [id])
+  variants        MenuItemVariant[]
+  modifierGroups  MenuItemModifierGroup[]
+  outletSettings  OutletMenuItem[]
+  prices          MenuItemPrice[]
+  comboComponents ComboComponent[]        @relation("ComboParent")
+  usedInCombos    ComboComponent[]        @relation("ComboChild")
+  recipes         Recipe[]
+  orderItems      OrderItem[]
+
+  @@unique([tenantId, shortCode])
+  @@index([tenantId, categoryId])
+}
+
+model MenuItemVariant {
+  id         String  @id @default(uuid(7)) @db.Uuid
+  tenantId   String  @db.Uuid
+  menuItemId String  @db.Uuid
+  name       String
+  price      Decimal @db.Decimal(12, 2)
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  menuItem        MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  prices          MenuItemPrice[]
+  recipes         Recipe[]
+  orderItems      OrderItem[]
+  comboComponents ComboComponent[]
+
+  @@index([tenantId])
+}
+
+model ModifierGroup {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  minSelect Int      @default(0)
+  maxSelect Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  options ModifierOption[]
+  items   MenuItemModifierGroup[]
+
+  @@index([tenantId])
+}
+
+model ModifierOption {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @db.Uuid
+  groupId   String    @db.Uuid
+  name      String // "Extra Cheese"
+  price     Decimal   @default(0) @db.Decimal(12, 2)
+  foodType  FoodType?
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+
+  group              ModifierGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orderItemModifiers OrderItemModifier[]
+
+  @@index([tenantId])
+}
+
+model MenuItemModifierGroup {
+  tenantId        String @db.Uuid
+  menuItemId      String @db.Uuid
+  modifierGroupId String @db.Uuid
+  sortOrder       Int    @default(0)
+
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, modifierGroupId])
+  @@index([tenantId])
+}
+
+model ComboComponent {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  tenantId        String  @db.Uuid
+  comboItemId     String  @db.Uuid
+  componentItemId String  @db.Uuid
+  variantId       String? @db.Uuid
+  quantity        Int     @default(1)
+
+  comboItem     MenuItem         @relation("ComboParent", fields: [comboItemId], references: [id], onDelete: Cascade)
+  componentItem MenuItem         @relation("ComboChild", fields: [componentItemId], references: [id])
+  variant       MenuItemVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model OutletMenuItem {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  tenantId     String  @db.Uuid
+  outletId     String  @db.Uuid
+  menuItemId   String  @db.Uuid
+  stationId    String? @db.Uuid
+  isAvailable  Boolean @default(true)
+  isOutOfStock Boolean @default(false)
+
+  outlet   Outlet          @relation(fields: [outletId], references: [id])
+  menuItem MenuItem        @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  station  KitchenStation? @relation(fields: [stationId], references: [id])
+
+  @@unique([outletId, menuItemId])
+  @@index([tenantId])
+}
+
+// Falls back to variant price, then basePrice. variantId is nullable so
+// uniqueness is enforced in the service, not here.
+model MenuItemPrice {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @db.Uuid
+  outletId   String    @db.Uuid
+  menuItemId String    @db.Uuid
+  variantId  String?   @db.Uuid
+  orderType  OrderType
+  price      Decimal   @db.Decimal(12, 2)
+
+  outlet   Outlet           @relation(fields: [outletId], references: [id])
+  menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  variant  MenuItemVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([outletId, menuItemId])
+  @@index([tenantId])
+}
+
+// floor & tables
+
+model FloorArea {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  tenantId  String  @db.Uuid
+  outletId  String  @db.Uuid
+  name      String // "AC Hall", "Rooftop"
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  outlet Outlet        @relation(fields: [outletId], references: [id])
+  tables DiningTable[]
+
+  @@index([tenantId])
+}
+
+model DiningTable {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  tenantId  String      @db.Uuid
+  outletId  String      @db.Uuid
+  areaId    String?     @db.Uuid
+  name      String
+  capacity  Int         @default(4)
+  status    TableStatus @default(AVAILABLE)
+  posX      Int?
+  posY      Int?
+  sortOrder Int         @default(0)
+  isActive  Boolean     @default(true)
+
+  outlet Outlet     @relation(fields: [outletId], references: [id])
+  area   FloorArea? @relation(fields: [areaId], references: [id])
+  orders Order[]
+
+  @@unique([outletId, name])
+  @@index([tenantId])
+}
+
+// customers & loyalty
+
+model Customer {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenantId      String    @db.Uuid
+  phone         String
+  name          String?
+  email         String?
+  birthday      DateTime? @db.Date
+  anniversary   DateTime? @db.Date
+  gstin         String?
+  address       String?
+  loyaltyPoints Decimal   @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal   @default(0) @db.Decimal(12, 2) // customer tab / dues
+  visits        Int       @default(0)
+  totalSpent    Decimal   @default(0) @db.Decimal(12, 2)
+  lastVisitAt   DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders      Order[]
+  loyaltyTxns LoyaltyTransaction[]
+
+  @@unique([tenantId, phone])
+}
+
+model LoyaltyTransaction {
+  id         String         @id @default(uuid(7)) @db.Uuid
+  tenantId   String         @db.Uuid
+  customerId String         @db.Uuid
+  orderId    String?        @db.Uuid
+  type       LoyaltyTxnType
+  points     Decimal        @db.Decimal(12, 2) // + earn, - redeem
+  note       String?
+  createdAt  DateTime       @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId, customerId])
+}
+
+// orders & kot
+
+model Order {
+  id            String      @id @default(uuid(7)) @db.Uuid // client may send its own
+  tenantId      String      @db.Uuid
+  outletId      String      @db.Uuid
+  deviceId      String?     @db.Uuid
+  businessDate  DateTime    @db.Date
+  orderNo       String
+  type          OrderType
+  status        OrderStatus @default(OPEN)
+  source        String      @default("POS") // later: QR, ZOMATO, SWIGGY
+  tableId       String?     @db.Uuid
+  customerId    String?     @db.Uuid
+  customerName  String?
+  customerPhone String?
+  covers        Int?
+  waiterId      String?     @db.Uuid
+  createdById   String      @db.Uuid
+  notes         String?
+
+  subtotal      Decimal @default(0) @db.Decimal(12, 2)
+  discountTotal Decimal @default(0) @db.Decimal(12, 2)
+  serviceCharge Decimal @default(0) @db.Decimal(12, 2)
+  taxTotal      Decimal @default(0) @db.Decimal(12, 2)
+  roundOff      Decimal @default(0) @db.Decimal(12, 2)
+  grandTotal    Decimal @default(0) @db.Decimal(12, 2)
+  paidTotal     Decimal @default(0) @db.Decimal(12, 2)
+
+  openedAt   DateTime  @default(now())
+  billedAt   DateTime?
+  closedAt   DateTime?
+  voidedAt   DateTime?
+  voidedById String?   @db.Uuid
+  voidReason String?
+  version    Int       @default(1) // sync conflict detection
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  outlet    Outlet          @relation(fields: [outletId], references: [id])
+  table     DiningTable?    @relation(fields: [tableId], references: [id])
+  customer  Customer?       @relation(fields: [customerId], references: [id])
+  items     OrderItem[]
+  kots      Kot[]
+  discounts OrderDiscount[]
+  payments  Payment[]
+  invoices  Invoice[]
+
+  @@unique([outletId, businessDate, orderNo])
+  @@index([tenantId, outletId, businessDate])
+  @@index([outletId, status])
+}
+
+model OrderItem {
+  id         String  @id @default(uuid(7)) @db.Uuid // client may send its own
+  tenantId   String  @db.Uuid
+  orderId    String  @db.Uuid
+  menuItemId String  @db.Uuid
+  variantId  String? @db.Uuid
+  kotId      String? @db.Uuid
+  stationId  String? @db.Uuid
+
+  itemName    String
+  variantName String?
+  foodType    FoodType
+  hsnCode     String?
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  taxBreakup  Json // [{ name: "CGST", rate: 2.5, amount: 5.00 }, ...]
+
+  quantity       Decimal         @db.Decimal(10, 3)
+  modifiersTotal Decimal         @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal         @default(0) @db.Decimal(12, 2)
+  taxableAmount  Decimal         @db.Decimal(12, 2)
+  taxAmount      Decimal         @db.Decimal(12, 2)
+  lineTotal      Decimal         @db.Decimal(12, 2)
+  status         OrderItemStatus @default(PENDING)
+  notes          String? // "less spicy"
+
+  cancelledAt   DateTime?
+  cancelledById String?   @db.Uuid
+  cancelReason  String?
+  createdById   String    @db.Uuid
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  order     Order               @relation(fields: [orderId], references: [id])
+  menuItem  MenuItem            @relation(fields: [menuItemId], references: [id])
+  variant   MenuItemVariant?    @relation(fields: [variantId], references: [id])
+  kot       Kot?                @relation(fields: [kotId], references: [id])
+  modifiers OrderItemModifier[]
+  discounts OrderDiscount[]
+
+  @@index([orderId])
+  @@index([tenantId, menuItemId])
+}
+
+model OrderItemModifier {
+  id               String  @id @default(uuid(7)) @db.Uuid
+  tenantId         String  @db.Uuid
+  orderItemId      String  @db.Uuid
+  modifierOptionId String? @db.Uuid
+  name             String // snapshot
+  price            Decimal @db.Decimal(12, 2) // snapshot
+  quantity         Int     @default(1)
+
+  orderItem      OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierOption ModifierOption? @relation(fields: [modifierOptionId], references: [id])
+
+  @@index([tenantId])
+}
+
+model Kot {
+  id          String    @id @default(uuid(7)) @db.Uuid // client may send its own
+  tenantId    String    @db.Uuid
+  outletId    String    @db.Uuid
+  orderId     String    @db.Uuid
+  stationId   String?   @db.Uuid
+  kotNo       String // "D1-K-0017"
+  status      KotStatus @default(NEW)
+  createdById String    @db.Uuid
+  printedAt   DateTime?
+  readyAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  order   Order           @relation(fields: [orderId], references: [id])
+  station KitchenStation? @relation(fields: [stationId], references: [id])
+  items   OrderItem[]
+
+  @@index([outletId, status]) // KDS screen query
+  @@index([tenantId])
+}
+
+// discounts
+
+model Discount {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  tenantId         String        @db.Uuid
+  name             String
+  code             String? // coupon code
+  type             DiscountType
+  value            Decimal       @db.Decimal(12, 2)
+  scope            DiscountScope
+  maxAmount        Decimal?      @db.Decimal(12, 2)
+  minOrderAmount   Decimal?      @db.Decimal(12, 2)
+  requiresApproval Boolean       @default(false)
+  validFrom        DateTime?
+  validTo          DateTime?
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  orderDiscounts OrderDiscount[]
+
+  @@unique([tenantId, code])
+}
+
+model OrderDiscount {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  tenantId     String       @db.Uuid
+  orderId      String       @db.Uuid
+  orderItemId  String?      @db.Uuid // null = whole bill
+  discountId   String?      @db.Uuid // null = manual/open discount
+  name         String // snapshot
+  type         DiscountType
+  value        Decimal      @db.Decimal(12, 2)
+  amount       Decimal      @db.Decimal(12, 2)
+  reason       String?
+  appliedById  String       @db.Uuid
+  approvedById String?      @db.Uuid
+  createdAt    DateTime     @default(now())
+
+  order     Order      @relation(fields: [orderId], references: [id])
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id])
+  discount  Discount?  @relation(fields: [discountId], references: [id])
+
+  @@index([tenantId, createdAt])
+}
+
+// billing
+
+model Invoice {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @db.Uuid
+  outletId      String   @db.Uuid
+  orderId       String   @db.Uuid
+  invoiceNo     String // "AND01/D1/26-27/000123"
+  series        String
+  financialYear String
+  businessDate  DateTime @db.Date
+  issuedAt      DateTime @default(now())
+
+  customerName  String?
+  customerPhone String?
+  customerGstin String?
+  placeOfSupply String?
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @db.Decimal(12, 2)
+  serviceCharge Decimal @db.Decimal(12, 2)
+  taxTotal      Decimal @db.Decimal(12, 2)
+  roundOff      Decimal @db.Decimal(12, 2)
+  grandTotal    Decimal @db.Decimal(12, 2)
+
+  status        InvoiceStatus @default(ISSUED)
+  cancelledAt   DateTime?
+  cancelledById String?       @db.Uuid
+  cancelReason  String?
+
+  order    Order            @relation(fields: [orderId], references: [id])
+  taxLines InvoiceTaxLine[]
+  payments Payment[]
+
+  @@unique([outletId, invoiceNo])
+  @@index([orderId])
+  @@index([tenantId, outletId, businessDate])
+}
+
+model InvoiceTaxLine {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  tenantId      String  @db.Uuid
+  invoiceId     String  @db.Uuid
+  taxName       String // CGST / SGST / IGST
+  rate          Decimal @db.Decimal(5, 2)
+  taxableAmount Decimal @db.Decimal(12, 2)
+  taxAmount     Decimal @db.Decimal(12, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Payment {
+  id           String        @id @default(uuid(7)) @db.Uuid // client may send its own
+  tenantId     String        @db.Uuid
+  outletId     String        @db.Uuid
+  orderId      String        @db.Uuid
+  invoiceId    String?       @db.Uuid
+  shiftId      String?       @db.Uuid
+  method       PaymentMethod
+  amount       Decimal       @db.Decimal(12, 2)
+  tipAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  reference    String? // UPI txn id / card last 4
+  status       PaymentStatus @default(SUCCESS)
+  receivedById String        @db.Uuid
+  paidAt       DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+  shift   Shift?   @relation(fields: [shiftId], references: [id])
+
+  @@index([tenantId, outletId, paidAt])
+  @@index([orderId])
+}
+
+model Shift {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  tenantId     String      @db.Uuid
+  outletId     String      @db.Uuid
+  deviceId     String?     @db.Uuid
+  businessDate DateTime    @db.Date
+  status       ShiftStatus @default(OPEN)
+  openedById   String      @db.Uuid
+  openedAt     DateTime    @default(now())
+  openingCash  Decimal     @db.Decimal(12, 2)
+  closedById   String?     @db.Uuid
+  closedAt     DateTime?
+  expectedCash Decimal?    @db.Decimal(12, 2)
+  closingCash  Decimal?    @db.Decimal(12, 2)
+  difference   Decimal?    @db.Decimal(12, 2)
+  notes        String?
+
+  outlet        Outlet         @relation(fields: [outletId], references: [id])
+  payments      Payment[]
+  cashMovements CashMovement[]
+
+  @@index([tenantId, outletId, businessDate])
+}
+
+model CashMovement {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  tenantId    String           @db.Uuid
+  shiftId     String           @db.Uuid
+  type        CashMovementType
+  amount      Decimal          @db.Decimal(12, 2)
+  reason      String
+  createdById String           @db.Uuid
+  createdAt   DateTime         @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([tenantId])
+}
+
+model DayClose {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @db.Uuid
+  outletId     String   @db.Uuid
+  businessDate DateTime @db.Date
+  closedById   String   @db.Uuid
+  closedAt     DateTime @default(now())
+  summary      Json // totals snapshot: sales, tax, payment-mode wise, voids...
+
+  @@unique([outletId, businessDate])
+  @@index([tenantId])
+}
+
+// inventory
+
+model InventoryItem {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  tenantId           String    @db.Uuid
+  name               String
+  sku                String?
+  category           String? // "Dairy", "Vegetables"
+  baseUnit           BaseUnit
+  purchaseUnit       String? // "kg"
+  purchaseUnitFactor Decimal   @default(1) @db.Decimal(14, 3) // 1 kg = 1000 g
+  reorderLevel       Decimal?  @db.Decimal(14, 3)
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  stocks            OutletStock[]
+  movements         StockMovement[]
+  recipeIngredients RecipeIngredient[]
+  poLines           PurchaseOrderLine[]
+  grnLines          GoodsReceiptLine[]
+  countLines        StockCountLine[]
+  transferLines     StockTransferLine[]
+
+  @@unique([tenantId, name])
+}
+
+// Cached balance. StockMovement is the source of truth.
+model OutletStock {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @db.Uuid
+  outletId        String   @db.Uuid
+  inventoryItemId String   @db.Uuid
+  quantity        Decimal  @default(0) @db.Decimal(14, 3)
+  avgCost         Decimal  @default(0) @db.Decimal(14, 4) // per base unit (weighted average)
+  reorderLevel    Decimal? @db.Decimal(14, 3)
+  updatedAt       DateTime @updatedAt
+
+  outlet        Outlet        @relation(fields: [outletId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@unique([outletId, inventoryItemId])
+  @@index([tenantId])
+}
+
+// Append-only.
+model StockMovement {
+  id              String            @id @default(uuid(7)) @db.Uuid
+  tenantId        String            @db.Uuid
+  outletId        String            @db.Uuid
+  inventoryItemId String            @db.Uuid
+  type            StockMovementType
+  quantity        Decimal           @db.Decimal(14, 3) // + in, - out
+  unitCost        Decimal?          @db.Decimal(14, 4)
+  balanceAfter    Decimal?          @db.Decimal(14, 3)
+  referenceType   String? // "ORDER_ITEM", "GRN", "TRANSFER", "STOCK_COUNT"
+  referenceId     String?           @db.Uuid
+  reason          String?
+  createdById     String?           @db.Uuid
+  createdAt       DateTime          @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId, outletId, inventoryItemId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model Recipe {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @db.Uuid
+  menuItemId String   @db.Uuid
+  variantId  String?  @db.Uuid
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  menuItem    MenuItem           @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  variant     MenuItemVariant?   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  ingredients RecipeIngredient[]
+
+  @@unique([menuItemId, variantId])
+  @@index([tenantId])
+}
+
+model RecipeIngredient {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  tenantId        String  @db.Uuid
+  recipeId        String  @db.Uuid
+  inventoryItemId String  @db.Uuid
+  quantity        Decimal @db.Decimal(14, 3)
+
+  recipe        Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@unique([recipeId, inventoryItemId])
+  @@index([tenantId])
+}
+
+model StockCount {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  tenantId    String           @db.Uuid
+  outletId    String           @db.Uuid
+  status      StockCountStatus @default(DRAFT)
+  countedById String           @db.Uuid
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+  notes       String?
+
+  lines StockCountLine[]
+
+  @@index([tenantId, outletId])
+}
+
+model StockCountLine {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  tenantId        String  @db.Uuid
+  stockCountId    String  @db.Uuid
+  inventoryItemId String  @db.Uuid
+  systemQty       Decimal @db.Decimal(14, 3)
+  countedQty      Decimal @db.Decimal(14, 3)
+  variance        Decimal @db.Decimal(14, 3) // counted - system
+  unitCost        Decimal @db.Decimal(14, 4)
+
+  stockCount    StockCount    @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@unique([stockCountId, inventoryItemId])
+  @@index([tenantId])
+}
+
+model StockTransfer {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  tenantId     String         @db.Uuid
+  fromOutletId String         @db.Uuid
+  toOutletId   String         @db.Uuid
+  transferNo   String
+  status       TransferStatus @default(DRAFT)
+  createdById  String         @db.Uuid
+  sentAt       DateTime?
+  receivedAt   DateTime?
+  receivedById String?        @db.Uuid
+  notes        String?
+  createdAt    DateTime       @default(now())
+
+  lines StockTransferLine[]
+
+  @@unique([tenantId, transferNo])
+}
+
+model StockTransferLine {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @db.Uuid
+  transferId      String   @db.Uuid
+  inventoryItemId String   @db.Uuid
+  quantity        Decimal  @db.Decimal(14, 3)
+  receivedQty     Decimal? @db.Decimal(14, 3)
+  unitCost        Decimal  @db.Decimal(14, 4)
+
+  transfer      StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId])
+}
+
+// purchase & vendors
+
+model Vendor {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  gstin       String?
+  address     String?
+  balanceDue  Decimal  @default(0) @db.Decimal(12, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  receipts       GoodsReceipt[]
+  payments       VendorPayment[]
+
+  @@unique([tenantId, name])
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  tenantId     String              @db.Uuid
+  outletId     String              @db.Uuid
+  vendorId     String              @db.Uuid
+  poNo         String
+  status       PurchaseOrderStatus @default(DRAFT)
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  subtotal     Decimal             @default(0) @db.Decimal(12, 2)
+  taxTotal     Decimal             @default(0) @db.Decimal(12, 2)
+  total        Decimal             @default(0) @db.Decimal(12, 2)
+  notes        String?
+  createdById  String              @db.Uuid
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  vendor   Vendor              @relation(fields: [vendorId], references: [id])
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+
+  @@unique([tenantId, poNo])
+}
+
+model PurchaseOrderLine {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  tenantId        String  @db.Uuid
+  purchaseOrderId String  @db.Uuid
+  inventoryItemId String  @db.Uuid
+  quantity        Decimal @db.Decimal(14, 3)
+  unitPrice       Decimal @db.Decimal(12, 2) // per purchase unit
+  taxRate         Decimal @default(0) @db.Decimal(5, 2)
+  receivedQty     Decimal @default(0) @db.Decimal(14, 3)
+  lineTotal       Decimal @db.Decimal(12, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId])
+}
+
+model GoodsReceipt {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tenantId          String    @db.Uuid
+  outletId          String    @db.Uuid
+  vendorId          String    @db.Uuid
+  purchaseOrderId   String?   @db.Uuid
+  grnNo             String
+  vendorInvoiceNo   String?
+  vendorInvoiceDate DateTime? @db.Date
+  receivedAt        DateTime  @default(now())
+  subtotal          Decimal   @db.Decimal(12, 2)
+  taxTotal          Decimal   @db.Decimal(12, 2)
+  total             Decimal   @db.Decimal(12, 2)
+  receivedById      String    @db.Uuid
+  notes             String?
+
+  vendor        Vendor             @relation(fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  lines         GoodsReceiptLine[]
+
+  @@unique([tenantId, grnNo])
+  @@index([tenantId, outletId, receivedAt])
+}
+
+model GoodsReceiptLine {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @db.Uuid
+  goodsReceiptId  String    @db.Uuid
+  inventoryItemId String    @db.Uuid
+  quantity        Decimal   @db.Decimal(14, 3) // purchase unit
+  unitPrice       Decimal   @db.Decimal(12, 2)
+  taxRate         Decimal   @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal   @db.Decimal(12, 2)
+  expiryDate      DateTime? @db.Date
+
+  goodsReceipt  GoodsReceipt  @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId])
+}
+
+model VendorPayment {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  tenantId    String        @db.Uuid
+  vendorId    String        @db.Uuid
+  amount      Decimal       @db.Decimal(12, 2)
+  method      PaymentMethod
+  reference   String?
+  paidAt      DateTime      @default(now())
+  notes       String?
+  createdById String        @db.Uuid
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@index([tenantId, vendorId])
+}
+
+// audit log
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String?  @db.Uuid // null = platform level action
+  outletId   String?  @db.Uuid
+  userId     String?  @db.Uuid
+  deviceId   String?  @db.Uuid
+  action     String // "order.void", "menu_item.price_change"
+  entityType String // "Order", "MenuItem"
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, entityId])
+}
+
+// Per-outlet running numbers (order no, KOT no). Incremented with
+// INSERT ... ON CONFLICT so concurrent tills never get the same number.
+model Counter {
+  outletId String @db.Uuid
+  key      String
+  value    Int    @default(0)
+
+  @@id([outletId, key])
+}
