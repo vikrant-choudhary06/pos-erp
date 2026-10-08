@@ -73,16 +73,15 @@ background and install it the next time Rizzoto starts (or straight away from "R
 update" in the tray or settings). Nothing restarts on its own during service.
 
 To ship one, bump `version` in `window/package.json` and push to `main`. CI builds the
-installer and uploads it to the Cloudflare R2 bucket the apps read from; pushes that don't
-change the version upload nothing.
+installer and publishes it as a release on the public `rizzoto-releases` repo, which the apps
+read from (the code repo stays private). Pushes that don't change the version publish nothing.
 
-One-time setup in GitHub (Settings → Secrets and variables → Actions):
+One-time setup in GitHub, on this repo (Settings → Secrets and variables → Actions):
 
-- variables `RIZZOTO_UPDATE_URL` (the bucket's public URL) and `R2_BUCKET` (its name)
-- secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with
-  write access to that bucket)
+- variable `RIZZOTO_UPDATE_REPO`: `owner/rizzoto-releases`
+- secret `RELEASES_TOKEN`: a fine-grained token with Contents read and write on that repo only
 
-Apps built without `RIZZOTO_UPDATE_URL` (local builds) never check for updates.
+Apps built without `RIZZOTO_UPDATE_REPO` (local builds) never check for updates.
 
 ## Deploying
 

@@ -16,7 +16,8 @@ win:
       arch: [x64]
   artifactName: Rizzoto-Setup-${version}.${ext}
 # Writes latest.yml next to the installer, which installed apps read to find
-# new versions. The real address is baked in by build.mjs, see src/updates.ts.
+# new versions. Where they look is baked in by build.mjs, see src/updates.ts;
+# CI uploads the files (scripts/publish-update.sh).
 publish:
   provider: generic
   url: https://updates.invalid

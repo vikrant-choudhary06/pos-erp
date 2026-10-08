@@ -10,11 +10,10 @@ await build({
   target: 'node22',
   format: 'cjs',
   external: ['electron'],
-  // where installed apps look for new versions; empty means no auto-update
+  // the public repo installed apps update from; empty means no auto-update
   define: {
-    'process.env.RIZZOTO_UPDATE_URL': JSON.stringify(
-      (process.env.RIZZOTO_UPDATE_URL ?? '').replace(/\/+$/, ''),
-    ),
+    'process.env.RIZZOTO_UPDATE_REPO': JSON.stringify(process.env.RIZZOTO_UPDATE_REPO ?? ''),
+    'process.env.RIZZOTO_UPDATE_HOST': JSON.stringify(process.env.RIZZOTO_UPDATE_HOST ?? ''),
   },
   sourcemap: 'linked',
   logLevel: 'warning',

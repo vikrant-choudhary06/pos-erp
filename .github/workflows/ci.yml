@@ -88,8 +88,8 @@ jobs:
     runs-on: windows-latest
     needs: check
     env:
-      # the address installed apps check for updates (public URL of the R2 bucket)
-      RIZZOTO_UPDATE_URL: ${{ vars.RIZZOTO_UPDATE_URL }}
+      # public repo whose releases installed apps update from ("owner/repo")
+      RIZZOTO_UPDATE_REPO: ${{ vars.RIZZOTO_UPDATE_REPO }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -108,11 +108,9 @@ jobs:
           path: window/release/*.exe
       # a new version in window/package.json reaches every counter PC from here
       - name: Publish the update
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RIZZOTO_UPDATE_URL != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RIZZOTO_UPDATE_REPO != ''
         shell: bash
         env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ vars.R2_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          # token that can write releases on that repo
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: bash window/scripts/publish-update.sh

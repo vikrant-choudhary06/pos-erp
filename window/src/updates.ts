@@ -9,9 +9,11 @@ import { autoUpdater } from 'electron-updater';
 //    in before anyone has started billing.
 // Nothing ever restarts the app in the middle of service on its own.
 
-// Set at build time (build.mjs) from RIZZOTO_UPDATE_URL. Local builds have
-// none and never look for updates.
-const FEED = process.env.RIZZOTO_UPDATE_URL ?? '';
+// Releases live on a public GitHub repo ("owner/repo"), set at build time
+// (build.mjs) from RIZZOTO_UPDATE_REPO. Local builds have none and never look
+// for updates. RIZZOTO_UPDATE_HOST points at a stand-in server for testing.
+const REPO = process.env.RIZZOTO_UPDATE_REPO ?? '';
+const HOST = process.env.RIZZOTO_UPDATE_HOST ?? '';
 
 const CHECK_EVERY = 4 * 60 * 60_000;
 // an update found ready this soon after launch was downloaded last time
@@ -38,7 +40,7 @@ let downloadedNow = false;
 const launchedAt = Date.now();
 
 export const updateState = () => state;
-export const updatesEnabled = () => app.isPackaged && Boolean(FEED);
+export const updatesEnabled = () => app.isPackaged && /^[\w.-]+\/[\w.-]+$/.test(REPO);
 
 function set(next: UpdateState) {
   state = next;
@@ -49,7 +51,13 @@ export function startUpdates(opts: Options) {
   options = opts;
   if (!updatesEnabled()) return;
 
-  autoUpdater.setFeedURL({ provider: 'generic', url: FEED });
+  const [owner, repo] = REPO.split('/');
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner,
+    repo,
+    ...(HOST && { host: HOST, protocol: 'http' as const }),
+  });
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.disableWebInstaller = true;
