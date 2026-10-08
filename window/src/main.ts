@@ -29,9 +29,17 @@ let quitting = false;
 let announced = '';
 
 const logFile = () => path.join(app.getPath('userData'), 'hub.log');
+// written straight away: an async write is lost behind a blocking error
+// dialog or a crash, which is exactly when the log is needed
 function log(message: string) {
-  fs.appendFile(logFile(), `${new Date().toISOString()} ${message}\n`, () => {});
+  try {
+    fs.appendFileSync(logFile(), `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // disk full or locked, nothing useful to do about it here
+  }
 }
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -62,23 +70,34 @@ async function start() {
 async function runHub() {
   await hub?.stop();
   hub = null;
-  try {
-    hub = await startHub({
-      cloudUrl: config.cloudUrl,
-      port: config.port,
-      dataDir: path.join(app.getPath('userData'), 'hub'),
-      log,
-    });
-  } catch (err) {
-    const busy = (err as NodeJS.ErrnoException).code === 'EADDRINUSE';
-    dialog.showErrorBox(
-      'Rizzoto',
-      busy
-        ? `Port ${config.port} is already in use. Pick another port in Settings.`
-        : `The local hub could not start: ${(err as Error).message}`,
-    );
-    return;
+  let started: Hub | null = null;
+  // right after an update the old copy can still be letting go of the port
+  for (let attempt = 1; !started; attempt++) {
+    try {
+      started = await startHub({
+        cloudUrl: config.cloudUrl,
+        port: config.port,
+        dataDir: path.join(app.getPath('userData'), 'hub'),
+        log,
+      });
+    } catch (err) {
+      const busy = (err as NodeJS.ErrnoException).code === 'EADDRINUSE';
+      if (busy && attempt < 10) {
+        log(`Port ${config.port} is busy, trying again`);
+        await wait(1500);
+        continue;
+      }
+      log(`Hub did not start: ${(err as Error).message}`);
+      dialog.showErrorBox(
+        'Rizzoto',
+        busy
+          ? `Port ${config.port} is already in use. Pick another port in Settings.`
+          : `The local hub could not start: ${(err as Error).message}`,
+      );
+      return;
+    }
   }
+  hub = started;
   hub.onChange(showStatus);
   showStatus(hub.status());
 }
@@ -248,7 +267,11 @@ app.on('will-quit', (event) => {
   event.preventDefault();
   const stopping = hub;
   hub = null;
-  void stopping.stop().finally(() => app.quit());
+  // the queue is saved on every change; never let a stuck socket keep an
+  // update (or Windows shutting down) waiting
+  void Promise.race([stopping.stop(), wait(3000)])
+    .catch(() => {})
+    .finally(() => app.quit());
 });
 app.on('window-all-closed', () => {
   // stay in the tray
