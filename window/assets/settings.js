@@ -44,11 +44,56 @@ function showStatus(status) {
   }
 }
 
+let version = '';
+
+function showUpdate(update, enabled = true) {
+  const text = document.getElementById('updateText');
+  const button = document.getElementById('updateButton');
+  button.hidden = !enabled;
+  button.disabled = false;
+  button.textContent = 'Check now';
+  button.dataset.action = 'check';
+
+  if (!enabled) {
+    text.textContent = `Version ${version} · updates are off in this build`;
+    return;
+  }
+  switch (update.state) {
+    case 'checking':
+      text.textContent = `Version ${version} · checking for updates…`;
+      button.disabled = true;
+      break;
+    case 'downloading':
+      text.textContent = `Downloading ${update.version} · ${update.percent}%`;
+      button.disabled = true;
+      break;
+    case 'ready':
+      text.textContent = `${update.version} is ready · installs on the next start`;
+      button.textContent = 'Restart to update';
+      button.dataset.action = 'install';
+      break;
+    case 'error':
+      text.textContent = `Version ${version} · couldn't check for updates`;
+      break;
+    default:
+      text.textContent = `Version ${version} · up to date`;
+  }
+}
+
+document.getElementById('updateButton').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (button.dataset.action === 'install') return window.rizzoto.installUpdate();
+  button.disabled = true;
+  showUpdate(await window.rizzoto.checkUpdate());
+});
+
 const cleanError = (err) =>
   String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
 async function init() {
-  const { config, status } = await window.rizzoto.load();
+  const { config, status, update, updates, version: current } = await window.rizzoto.load();
+  version = current;
+  showUpdate(update, updates);
   form.cloudUrl.value = config.cloudUrl;
   form.port.value = config.port;
   form.startWithWindows.checked = config.startWithWindows;
@@ -100,4 +145,5 @@ document.getElementById('sync').addEventListener('click', async (event) => {
 });
 
 window.rizzoto.onStatus(showStatus);
+window.rizzoto.onUpdate((update) => showUpdate(update));
 init();

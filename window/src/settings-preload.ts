@@ -10,4 +10,9 @@ contextBridge.exposeInMainWorld('rizzoto', {
   onStatus: (fn: (status: unknown) => void) => {
     ipcRenderer.on('hub:status', (_e, status) => fn(status));
   },
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdate: (fn: (update: unknown) => void) => {
+    ipcRenderer.on('update:status', (_e, update) => fn(update));
+  },
 });

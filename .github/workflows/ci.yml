@@ -87,6 +87,9 @@ jobs:
   desktop:
     runs-on: windows-latest
     needs: check
+    env:
+      # the address installed apps check for updates (public URL of the R2 bucket)
+      RIZZOTO_UPDATE_URL: ${{ vars.RIZZOTO_UPDATE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -96,8 +99,20 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @pos/shared build
-      - run: pnpm --filter window dist
+      - name: Build the installer
+        working-directory: window
+        run: node build.mjs && pnpm exec electron-builder --win --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: counter-pos-windows
+          name: rizzoto-windows
           path: window/release/*.exe
+      # a new version in window/package.json reaches every counter PC from here
+      - name: Publish the update
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RIZZOTO_UPDATE_URL != ''
+        shell: bash
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: bash window/scripts/publish-update.sh

@@ -66,6 +66,24 @@ the printers picked in the app's settings (Ctrl + , or the tray icon). Closing t
 keeps the hub running in the tray. Without a screen, `node window/dist/hub-cli.js --cloud
 https://your-domain` runs only the hub.
 
+### Updates
+
+Installed apps update themselves. They check every few hours, download a new version in the
+background and install it the next time Rizzoto starts (or straight away from "Restart to
+update" in the tray or settings). Nothing restarts on its own during service.
+
+To ship one, bump `version` in `window/package.json` and push to `main`. CI builds the
+installer and uploads it to the Cloudflare R2 bucket the apps read from; pushes that don't
+change the version upload nothing.
+
+One-time setup in GitHub (Settings → Secrets and variables → Actions):
+
+- variables `RIZZOTO_UPDATE_URL` (the bucket's public URL) and `R2_BUCKET` (its name)
+- secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with
+  write access to that bucket)
+
+Apps built without `RIZZOTO_UPDATE_URL` (local builds) never check for updates.
+
 ## Deploying
 
 One server with Docker. Point your domain at it, then:
