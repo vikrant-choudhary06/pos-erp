@@ -215,11 +215,11 @@ function Choice({
       onClick={onClick}
       className={cn(
         'flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors',
-        active ? 'border-ink bg-ink text-white' : 'border-line hover:border-line-strong',
+        active ? 'border-ink bg-ink text-on-ink' : 'border-line hover:border-line-strong',
       )}
     >
       <span>{label}</span>
-      <span className={cn('tabular text-xs', active ? 'text-white/70' : 'text-ink-faint')}>
+      <span className={cn('tabular text-xs', active ? 'text-on-ink/70' : 'text-ink-faint')}>
         {price}
       </span>
     </button>

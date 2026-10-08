@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Logo } from '@/components/logo';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useSession } from '@/lib/session';
@@ -86,7 +87,7 @@ export function Sidebar() {
         <Logo href="/dashboard" />
         <button
           onClick={() => setOpen(true)}
-          className="rounded-lg p-2 text-ink-soft hover:bg-black/[0.04]"
+          className="rounded-lg p-2 text-ink-soft hover:bg-ink/[0.04]"
           aria-label="Open menu"
         >
           <Menu className="size-5" />
@@ -176,7 +177,7 @@ function SidebarContent() {
                   {active && (
                     <m.span
                       layoutId="nav-active"
-                      className="absolute inset-0 rounded-lg bg-black/[0.055]"
+                      className="absolute inset-0 rounded-lg bg-ink/[0.055]"
                       transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                     />
                   )}
@@ -191,16 +192,17 @@ function SidebarContent() {
 
       <div className="mt-4 border-t border-line pt-4">
         <div className="flex items-center gap-2.5 px-2">
-          <div className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-xs font-medium text-white">
+          <div className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-xs font-medium text-on-ink">
             {initials(me.user.name)}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-medium">{me.user.name}</p>
             <p className="truncate text-xs text-ink-faint">{me.user.role.name}</p>
           </div>
+          <ThemeToggle className="size-8 text-ink-faint" />
           <button
             onClick={logout}
-            className="rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-black/[0.04] hover:text-ink"
+            className="rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-ink/[0.04] hover:text-ink"
             aria-label="Sign out"
             title="Sign out"
           >

@@ -132,7 +132,7 @@ export default function LockPage() {
                       }}
                       className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-card px-4 py-6 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong active:scale-[0.98]"
                     >
-                      <span className="grid size-12 place-items-center rounded-full bg-ink text-base font-medium text-white">
+                      <span className="grid size-12 place-items-center rounded-full bg-ink text-base font-medium text-on-ink">
                         {s.name.slice(0, 1).toUpperCase()}
                       </span>
                       <span className="text-center">
@@ -199,7 +199,7 @@ export default function LockPage() {
                 <Key onClick={() => press('0')}>0</Key>
                 <Key
                   onClick={() => pin.length >= 4 && submit(pin)}
-                  className="bg-ink text-sm text-white hover:bg-ink/85"
+                  className="bg-ink text-sm text-on-ink hover:bg-ink/85"
                   disabled={pin.length < 4 || busy}
                 >
                   {busy ? <Spinner /> : 'Go'}
@@ -218,7 +218,7 @@ function Key({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonEleme
     <button
       type="button"
       className={cn(
-        'tabular grid h-16 place-items-center rounded-2xl bg-card text-xl font-medium shadow-sm shadow-black/[0.03] transition-[background-color,transform] select-none hover:bg-black/[0.03] active:scale-95 disabled:opacity-40',
+        'tabular grid h-16 place-items-center rounded-2xl bg-card text-xl font-medium shadow-sm shadow-black/[0.03] transition-[background-color,transform] select-none hover:bg-ink/[0.03] active:scale-95 disabled:opacity-40',
         className,
       )}
       {...props}

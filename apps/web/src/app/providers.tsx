@@ -5,6 +5,7 @@ import { domMax, LazyMotion, MotionConfig } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
 import { ApiError } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 
 // no point retrying when offline (the till falls back to its own data) or
 // when the server said no
@@ -23,6 +24,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
+  const { theme } = useTheme();
+
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -35,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </LazyMotion>
       <Toaster
+        theme={theme}
         position="bottom-center"
         toastOptions={{
           className: '!rounded-xl !border-line !text-[13px] !shadow-lg !shadow-black/5',

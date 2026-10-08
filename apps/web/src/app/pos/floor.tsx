@@ -85,14 +85,14 @@ export function Floor({ menu, onOpen }: { menu: PosMenu; onOpen: (id: string) =>
                     order
                       ? billed
                         ? 'border-ink bg-card ring-2 ring-ink ring-inset'
-                        : 'border-ink bg-ink text-white'
+                        : 'border-ink bg-ink text-on-ink'
                       : 'border-line bg-card hover:border-line-strong',
                   )}
                 >
                   <span className="flex items-start justify-between">
                     <span className="text-base font-semibold">{table.name}</span>
                     {billed && (
-                      <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] font-medium text-on-ink">
                         BILL
                       </span>
                     )}
@@ -100,7 +100,7 @@ export function Floor({ menu, onOpen }: { menu: PosMenu; onOpen: (id: string) =>
                   {order ? (
                     <span className="tabular text-xs">
                       <span className="block font-medium">{formatMoney(order.grandTotal)}</span>
-                      <span className={billed ? 'text-ink-faint' : 'text-white/60'}>
+                      <span className={billed ? 'text-ink-faint' : 'text-on-ink/60'}>
                         #{order.orderNo} · {elapsed(order.openedAt, now)}
                       </span>
                     </span>
@@ -172,7 +172,7 @@ export function Floor({ menu, onOpen }: { menu: PosMenu; onOpen: (id: string) =>
         <button
           disabled={create.isPending}
           onClick={() => create.mutate({ type: 'COUNTER' })}
-          className="m-4 mt-0 hidden h-11 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-medium text-white hover:bg-ink/85 lg:flex"
+          className="m-4 mt-0 hidden h-11 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-medium text-on-ink hover:bg-ink/85 lg:flex"
         >
           <Plus className="size-4" /> Quick bill
         </button>

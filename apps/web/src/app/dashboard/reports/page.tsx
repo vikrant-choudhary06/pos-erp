@@ -479,13 +479,13 @@ function Tile({
   return (
     <div
       className={
-        strong ? 'rounded-2xl bg-ink p-4 text-white' : 'rounded-2xl border border-line bg-card p-4'
+        strong ? 'rounded-2xl bg-ink p-4 text-on-ink' : 'rounded-2xl border border-line bg-card p-4'
       }
     >
-      <p className={strong ? 'text-xs text-white/60' : 'text-xs text-ink-faint'}>{label}</p>
+      <p className={strong ? 'text-xs text-on-ink/60' : 'text-xs text-ink-faint'}>{label}</p>
       <p className="tabular mt-1.5 text-xl font-semibold tracking-tight">{value}</p>
       {hint && (
-        <p className={strong ? 'text-xs text-white/60' : 'text-xs text-ink-faint'}>{hint}</p>
+        <p className={strong ? 'text-xs text-on-ink/60' : 'text-xs text-ink-faint'}>{hint}</p>
       )}
     </div>
   );

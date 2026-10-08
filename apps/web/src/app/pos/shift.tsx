@@ -39,11 +39,11 @@ export function ShiftBanner() {
           </button>
         </div>
       ) : (
-        <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-line bg-ink px-4 text-[13px] text-white">
+        <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-line bg-ink px-4 text-[13px] text-on-ink">
           <span>No cash shift is open. Payments need an open shift.</span>
           <button
             onClick={() => setPanel('open')}
-            className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-ink"
+            className="rounded-md bg-on-ink px-2.5 py-1 text-xs font-medium text-ink"
           >
             Open shift
           </button>
@@ -258,8 +258,8 @@ function ManageShift({
 
 function Stat({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
   return (
-    <div className={strong ? 'rounded-xl bg-ink p-3 text-white' : 'rounded-xl bg-paper p-3'}>
-      <dt className={strong ? 'text-xs text-white/60' : 'text-xs text-ink-faint'}>{label}</dt>
+    <div className={strong ? 'rounded-xl bg-ink p-3 text-on-ink' : 'rounded-xl bg-paper p-3'}>
+      <dt className={strong ? 'text-xs text-on-ink/60' : 'text-xs text-ink-faint'}>{label}</dt>
       <dd className="mt-1 text-base font-semibold">{formatMoney(value)}</dd>
     </div>
   );

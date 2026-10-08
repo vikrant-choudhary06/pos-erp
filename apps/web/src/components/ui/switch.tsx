@@ -28,7 +28,7 @@ export function Switch({ checked, onChange, label, disabled }: Props) {
       <m.span
         layout
         transition={{ type: 'spring', stiffness: 700, damping: 40 }}
-        className={cn('size-4 rounded-full bg-white shadow-sm', checked && 'ml-auto')}
+        className={cn('size-4 rounded-full shadow-sm', checked ? 'ml-auto bg-on-ink' : 'bg-white')}
       />
     </button>
   );

@@ -102,7 +102,7 @@ export default function MenuPage() {
               {editable && (
                 <button
                   onClick={() => setEditingCategory('new')}
-                  className="rounded-md p-1 text-ink-faint hover:bg-black/[0.04] hover:text-ink"
+                  className="rounded-md p-1 text-ink-faint hover:bg-ink/[0.04] hover:text-ink"
                   aria-label="Add category"
                 >
                   <Plus className="size-3.5" />
@@ -221,7 +221,7 @@ function CategoryButton({
         onClick={onClick}
         className={cn(
           'flex h-8 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-[13px] transition-colors',
-          active ? 'bg-black/[0.055] font-medium text-ink' : 'text-ink-soft hover:text-ink',
+          active ? 'bg-ink/[0.055] font-medium text-ink' : 'text-ink-soft hover:text-ink',
         )}
       >
         <span className="truncate">{label}</span>

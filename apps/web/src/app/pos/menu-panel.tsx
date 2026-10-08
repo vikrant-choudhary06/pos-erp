@@ -88,7 +88,7 @@ export function MenuPanel({
                 'h-8 shrink-0 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors',
                 category === c.id
                   ? 'bg-ink font-medium text-paper'
-                  : 'bg-black/[0.045] text-ink-soft hover:text-ink',
+                  : 'bg-ink/[0.045] text-ink-soft hover:text-ink',
               )}
             >
               {c.name}

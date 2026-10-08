@@ -402,12 +402,12 @@ export function OrderScreen({
       <div className="flex items-center gap-2 border-b border-line bg-paper px-3 py-2 md:hidden">
         <button
           onClick={leave}
-          className="grid size-9 place-items-center rounded-lg hover:bg-black/[0.04]"
+          className="grid size-9 place-items-center rounded-lg hover:bg-ink/[0.04]"
           aria-label="Back"
         >
           <ArrowLeft className="size-4" />
         </button>
-        <div className="ml-auto flex rounded-[10px] bg-black/[0.045] p-[3px] text-[13px]">
+        <div className="ml-auto flex rounded-[10px] bg-ink/[0.045] p-[3px] text-[13px]">
           <button
             onClick={() => setView('menu')}
             className={cn('h-8 rounded-[8px] px-3', view === 'menu' && 'bg-card shadow-sm')}
@@ -691,10 +691,10 @@ function Line({
             className={cn(
               'rounded px-1.5 py-0.5 text-[10px] font-medium',
               status === 'NEW'
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-on-ink'
                 : status === 'READY'
                   ? 'bg-veg/10 text-veg'
-                  : 'bg-black/[0.05] text-ink-faint',
+                  : 'bg-ink/[0.05] text-ink-faint',
             )}
           >
             {label[status]}
@@ -744,7 +744,7 @@ function IconButton({
       title={label}
       className={cn(
         'grid size-9 place-items-center rounded-lg transition-colors',
-        active ? 'bg-ink text-white' : 'text-ink-soft hover:bg-black/[0.04] hover:text-ink',
+        active ? 'bg-ink text-on-ink' : 'text-ink-soft hover:bg-ink/[0.04] hover:text-ink',
       )}
     >
       {children}

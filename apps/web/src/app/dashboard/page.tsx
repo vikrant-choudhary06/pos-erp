@@ -100,7 +100,7 @@ export default function OverviewPage() {
                   <span
                     className={cn(
                       'grid size-6 shrink-0 place-items-center rounded-full border transition-colors',
-                      step.done ? 'border-ink bg-ink text-white' : 'border-line-strong',
+                      step.done ? 'border-ink bg-ink text-on-ink' : 'border-line-strong',
                     )}
                   >
                     {step.done && <Check className="size-3.5" strokeWidth={2.5} />}

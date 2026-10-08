@@ -8,6 +8,7 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { FoodMark } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs } from '@/components/ui/tabs';
@@ -98,7 +99,7 @@ export default function KitchenPage() {
       <header className="flex h-14 shrink-0 items-center gap-4 border-b border-line px-4">
         <Link
           href={can('order.take') ? '/pos' : '/dashboard'}
-          className="grid size-9 place-items-center rounded-lg hover:bg-black/[0.04]"
+          className="grid size-9 place-items-center rounded-lg hover:bg-ink/[0.04]"
           aria-label="Back"
         >
           <ArrowLeft className="size-4" />
@@ -123,9 +124,10 @@ export default function KitchenPage() {
               ]}
             />
           )}
+          <ThemeToggle />
           <button
             onClick={() => setSound(!sound)}
-            className="grid size-9 place-items-center rounded-lg text-ink-soft hover:bg-black/[0.04]"
+            className="grid size-9 place-items-center rounded-lg text-ink-soft hover:bg-ink/[0.04]"
             aria-label={sound ? 'Mute' : 'Unmute'}
           >
             {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
@@ -168,7 +170,7 @@ export default function KitchenPage() {
                     <div
                       className={cn(
                         'flex items-start justify-between px-4 py-3',
-                        kot.status === 'NEW' ? 'bg-ink text-white' : 'border-b border-line',
+                        kot.status === 'NEW' ? 'bg-ink text-on-ink' : 'border-b border-line',
                       )}
                     >
                       <div>
@@ -178,7 +180,7 @@ export default function KitchenPage() {
                         <p
                           className={cn(
                             'text-xs',
-                            kot.status === 'NEW' ? 'text-white/60' : 'text-ink-faint',
+                            kot.status === 'NEW' ? 'text-on-ink/60' : 'text-ink-faint',
                           )}
                         >
                           KOT {kot.kotNo} · #{kot.order.orderNo}

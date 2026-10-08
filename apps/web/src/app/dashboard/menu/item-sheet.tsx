@@ -385,7 +385,7 @@ export function ItemSheet({ item, categories, defaultCategoryId, onClose }: Prop
                       }
                       className={
                         on
-                          ? 'h-8 rounded-lg bg-ink px-3 text-[13px] text-white'
+                          ? 'h-8 rounded-lg bg-ink px-3 text-[13px] text-on-ink'
                           : 'h-8 rounded-lg border border-line px-3 text-[13px] text-ink-soft hover:border-line-strong'
                       }
                     >

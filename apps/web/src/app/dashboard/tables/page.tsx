@@ -86,7 +86,7 @@ export default function TablesPage() {
           {editable && currentArea && (
             <button
               onClick={() => setEditingArea(currentArea)}
-              className="rounded-lg p-2 text-ink-faint hover:bg-black/[0.04] hover:text-ink"
+              className="rounded-lg p-2 text-ink-faint hover:bg-ink/[0.04] hover:text-ink"
               aria-label="Edit area"
             >
               <Pencil className="size-3.5" />

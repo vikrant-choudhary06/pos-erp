@@ -12,7 +12,7 @@ export function Badge({
     <span
       className={cn(
         'inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium',
-        tone === 'neutral' && 'bg-black/[0.05] text-ink-soft',
+        tone === 'neutral' && 'bg-ink/[0.05] text-ink-soft',
         tone === 'muted' && 'border border-line text-ink-faint',
         tone === 'danger' && 'bg-danger/[0.08] text-danger',
       )}
@@ -67,5 +67,5 @@ export function EmptyState({
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-lg bg-black/[0.05]', className)} />;
+  return <div className={cn('animate-pulse rounded-lg bg-ink/[0.05]', className)} />;
 }

@@ -78,7 +78,7 @@ export default function StaffPage() {
                     <div
                       className={cn(
                         'grid size-8 shrink-0 place-items-center rounded-full text-xs font-medium',
-                        person.isOwner ? 'bg-ink text-white' : 'bg-black/[0.06] text-ink-soft',
+                        person.isOwner ? 'bg-ink text-on-ink' : 'bg-ink/[0.06] text-ink-soft',
                       )}
                     >
                       {person.name.slice(0, 1).toUpperCase()}

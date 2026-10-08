@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { SmoothScroll } from '@/components/smooth-scroll';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { BillPreview, Reveal, Steps } from './home-parts';
 
 const FEATURES = [
@@ -49,9 +50,10 @@ export default function Home() {
             >
               How it works
             </a>
+            <ThemeToggle />
             <Link
               href="/login"
-              className="ml-2 rounded-[10px] bg-ink px-4 py-2 font-medium text-white transition-colors hover:bg-ink/85"
+              className="ml-2 rounded-[10px] bg-ink px-4 py-2 font-medium text-on-ink transition-colors hover:bg-ink/85"
             >
               Sign in
             </Link>
@@ -79,7 +81,7 @@ export default function Home() {
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link
                 href="/login"
-                className="rounded-xl bg-ink px-5 py-3 text-[15px] font-medium text-white transition-[background-color,transform] hover:bg-ink/85 active:scale-[0.98]"
+                className="rounded-xl bg-ink px-5 py-3 text-[15px] font-medium text-on-ink transition-[background-color,transform] hover:bg-ink/85 active:scale-[0.98]"
               >
                 Start free trial
               </Link>
@@ -139,7 +141,7 @@ export default function Home() {
               </h2>
               <Link
                 href="/login"
-                className="mt-10 inline-block rounded-xl bg-ink px-6 py-3.5 text-[15px] font-medium text-white transition-[background-color,transform] hover:bg-ink/85 active:scale-[0.98]"
+                className="mt-10 inline-block rounded-xl bg-ink px-6 py-3.5 text-[15px] font-medium text-on-ink transition-[background-color,transform] hover:bg-ink/85 active:scale-[0.98]"
               >
                 Create your account
               </Link>
