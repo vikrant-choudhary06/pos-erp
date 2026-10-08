@@ -85,6 +85,31 @@ Back up the database daily, for example:
 docker compose -f docker-compose.prod.yml exec postgres pg_dump -U pos pos | gzip > backup-$(date +%F).sql.gz
 ```
 
+### Website on Cloudflare
+
+The web app can also run on Cloudflare Workers (through the OpenNext adapter) while the API
+and Postgres stay on a server. Every page is static, so the Worker mostly serves files and
+forwards `/api/*` to the API.
+
+1. Host the API somewhere with Postgres (the Docker setup above without the `web` service, or
+   any Node host). Set its `WEB_URL` to the site's address, e.g. `https://rizzoto.in`, or the
+   API will refuse writes from the site.
+2. In GitHub → Settings → Secrets and variables → Actions add the secrets
+   `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare Workers") and `CLOUDFLARE_ACCOUNT_ID`,
+   and the variable `API_URL` (the API's public address). `API_URL` is baked in at build time.
+3. Push to `main`. `.github/workflows/deploy-web.yml` builds and deploys the `rizzoto-web`
+   Worker. Then add your domain under the Worker's Settings → Domains & Routes.
+
+By hand, from Linux, macOS or WSL (the build needs symlinks, which Windows blocks):
+
+```bash
+npx wrangler login
+API_URL=https://api.rizzoto.in pnpm --filter web cf:build
+pnpm --filter web cf:deploy
+```
+
+`pnpm --filter web cf:preview` runs the built Worker locally on port 8787.
+
 ## How things fit together
 
 - **Sign in.** Owners use email + a 6 digit code. A new email goes through onboarding, which
