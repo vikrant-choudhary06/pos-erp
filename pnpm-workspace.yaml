@@ -10,3 +10,4 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
   prisma: true
+  workerd: true
