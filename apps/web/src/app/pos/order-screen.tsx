@@ -108,7 +108,7 @@ export function OrderScreen({
   }
 
   const printKots = (kots: Kot[]) => {
-    if (menu.outlet.settings.printKot) kots.forEach((k) => printHtml(kotHtml(k)));
+    if (menu.outlet.settings.printKot) kots.forEach((k) => printHtml(kotHtml(k), 'kot'));
   };
 
   const sendKot = () =>

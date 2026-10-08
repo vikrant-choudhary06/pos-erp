@@ -1,0 +1,25 @@
+{
+  "name": "window",
+  "version": "0.1.0",
+  "productName": "Counter POS",
+  "private": true,
+  "description": "Counter POS for Windows: the counter app plus a local hub the shop's tablets use when the internet is down",
+  "author": "Counter",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node build.mjs && electron .",
+    "hub": "node build.mjs && node dist/hub-cli.js",
+    "dist": "node build.mjs && electron-builder --win",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@pos/shared": "workspace:*",
+    "@types/node": "^22.20.5",
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.12",
+    "typescript": "~5.9.3"
+  }
+}

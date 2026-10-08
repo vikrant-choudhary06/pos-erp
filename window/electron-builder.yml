@@ -1,0 +1,23 @@
+appId: in.counter.pos
+productName: Counter POS
+copyright: Counter
+directories:
+  output: release
+files:
+  - dist/**
+  - '!dist/hub-cli.*'
+  - '!dist/**/*.map'
+  - assets/**
+  - package.json
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Counter-POS-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: Counter POS

@@ -1,9 +1,12 @@
-import { calculateBill, toPaise, type OrderType, type PaymentMethod } from '@pos/shared';
-import type { Kot, Order, OrderItem, PosItem, PosMenu } from '@/lib/pos-types';
+import { calculateBill } from './bill';
+import { toPaise } from './money';
+import type { OrderType, PaymentMethod } from './orders';
+import type { Kot, Order, OrderItem, PosItem, PosMenu } from './pos-types';
 
-// The same rules the API applies, run on the till's own copy of an order while
-// offline. Totals come from calculateBill, so they match once the server replays
-// the same steps.
+// The same rules the API applies, run on a local copy of an order while the
+// cloud can't be reached: by the browser till (version 1) and by the counter
+// hub (version 2). Totals come from calculateBill, so they match once the
+// server replays the same steps.
 
 const str = (n: number) => String(Math.round(n * 100) / 100);
 

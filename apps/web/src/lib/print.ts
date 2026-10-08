@@ -1,4 +1,5 @@
 import { ORDER_TYPES, PAYMENT_METHODS } from '@pos/shared';
+import { toast } from 'sonner';
 import type { Kot, Order } from './pos-types';
 
 // Receipts are printed from a hidden iframe so the POS screen itself is never
@@ -27,7 +28,24 @@ const STYLE = `
   .note { font-size: 11px; padding-left: 10px; }
 `;
 
-export function printHtml(body: string) {
+type Desktop = { print(html: string, kind: 'bill' | 'kot'): Promise<void> };
+
+/**
+ * Prints a receipt. In the Counter desktop app it goes straight to the bill
+ * or kitchen printer; in a browser it opens the print dialog.
+ */
+export function printHtml(body: string, kind: 'bill' | 'kot' = 'bill') {
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${STYLE}</style></head><body>${body}</body></html>`;
+  const desktop = (window as { counterDesktop?: Desktop }).counterDesktop;
+  if (desktop) {
+    desktop.print(html, kind).catch(() => {
+      toast.error(kind === 'kot' ? 'KOT did not print' : 'Bill did not print', {
+        description: 'Check the printer in Counter POS settings',
+      });
+    });
+    return;
+  }
+
   const frame = document.createElement('iframe');
   frame.style.cssText =
     'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
@@ -35,9 +53,7 @@ export function printHtml(body: string) {
 
   const doc = frame.contentDocument!;
   doc.open();
-  doc.write(
-    `<!doctype html><html><head><meta charset="utf-8"><style>${STYLE}</style></head><body>${body}</body></html>`,
-  );
+  doc.write(html);
   doc.close();
 
   const win = frame.contentWindow!;

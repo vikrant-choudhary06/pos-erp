@@ -7,7 +7,7 @@ import { newId } from '@/lib/id';
 import type { Kot, Order, OrderItem, PosMenu, Shift } from '@/lib/pos-types';
 import { useSession } from '@/lib/session';
 import { db } from '@/offline/db';
-import * as engine from '@/offline/engine';
+import { orderEngine as engine } from '@pos/shared';
 import { isLocalMode } from '@/offline/state';
 import { enqueue, flush } from '@/offline/sync';
 import { nextTillNumber } from '@/offline/till';
