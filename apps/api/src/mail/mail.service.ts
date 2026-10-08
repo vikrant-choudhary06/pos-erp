@@ -12,7 +12,7 @@ export class MailService {
     const key = config.get<string>('RESEND_API_KEY');
     this.resend = key ? new Resend(key) : null;
     // hosting dashboards keep quotes pasted from a .env file as part of the value
-    const from = String(config.get('MAIL_FROM') ?? '').trim().replace(/^(["'])(.*)$/, '$2');
+    const from = String(config.get('MAIL_FROM') ?? '').trim().replace(/^(["'])(.*)\1$/, '$2');
     this.from = from || 'Rizzoto <onboarding@resend.dev>';
   }
 
