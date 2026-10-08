@@ -21,6 +21,7 @@ import { AuthUser, Can, CurrentUser } from '../auth/decorators';
 import { hasPermission } from '../common/permissions';
 import {
   AddItemsDto,
+  BillDto,
   CreateOrderDto,
   DiscountDto,
   OptionalReasonDto,
@@ -166,8 +167,12 @@ export class OrdersController {
   @Can('bill.settle')
   @Post('orders/:id/bill')
   @HttpCode(200)
-  bill(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.bill(user, id);
+  bill(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: BillDto,
+  ) {
+    return this.orders.bill(user, id, body);
   }
 
   @Can('bill.void')

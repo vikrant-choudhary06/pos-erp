@@ -71,6 +71,8 @@ export class PosMenuService {
         id: outlet.id,
         name: outlet.name,
         code: outlet.code,
+        timezone: outlet.timezone,
+        dayStartTime: outlet.dayStartTime,
         priceIncludesTax: outlet.priceIncludesTax,
         settings: outletSettings(outlet.settings),
       },

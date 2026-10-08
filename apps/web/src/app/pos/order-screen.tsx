@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { FoodMark } from '@/components/ui/misc';
 import { Dialog } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
-import { api, errorMessage } from '@/lib/api';
+import { errorMessage } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { newId } from '@/lib/id';
 import type { Kot, Order, OrderItem, PosItem, PosMenu } from '@/lib/pos-types';
@@ -38,8 +38,8 @@ import {
   useActiveOrders,
   useBillHeader,
   useOrder,
-  useOrderCache,
 } from './use-pos';
+import { usePosActions } from './actions';
 
 type Panel = 'pay' | 'discount' | 'guest' | 'move' | 'void' | 'reopen' | 'leave' | null;
 
@@ -55,7 +55,7 @@ export function OrderScreen({
   const { can } = useSession();
   const { data: order } = useOrder(orderId);
   const active = useActiveOrders();
-  const cache = useOrderCache();
+  const actions = usePosActions(menu);
   const header = useBillHeader();
 
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -102,42 +102,28 @@ export function OrderScreen({
   }
 
   async function saveDrafts() {
-    if (!drafts.length) return order!;
-    const saved = await api<Order>(`/orders/${orderId}/items`, {
-      method: 'POST',
-      body: {
-        items: drafts.map((d) => ({
-          id: d.key,
-          menuItemId: d.item.id,
-          variantId: d.variantId,
-          quantity: d.quantity,
-          notes: d.notes,
-          modifierOptionIds: d.optionIds.length ? d.optionIds : undefined,
-        })),
-      },
-    });
+    const saved = await actions.sendLines(order!, drafts);
     setDrafts([]);
-    cache(saved);
     return saved;
   }
 
+  const printKots = (kots: Kot[]) => {
+    if (menu.outlet.settings.printKot) kots.forEach((k) => printHtml(kotHtml(k)));
+  };
+
   const sendKot = () =>
     run('kot', async () => {
-      await saveDrafts();
-      const kots = await api<Kot[]>(`/orders/${orderId}/kot`, { method: 'POST' });
-      cache(await api<Order>(`/orders/${orderId}`));
-      if (menu.outlet.settings.printKot) kots.forEach((k) => printHtml(kotHtml(k)));
+      const kots = await actions.sendKot(order, drafts);
+      setDrafts([]);
+      printKots(kots);
       toast.success(kots.length > 1 ? `${kots.length} KOTs sent` : `KOT #${kots[0].kotNo} sent`);
     });
 
   const printBill = () =>
     run('bill', async () => {
-      await saveDrafts();
-      const billed =
-        order.status === 'OPEN'
-          ? await api<Order>(`/orders/${orderId}/bill`, { method: 'POST' })
-          : order;
-      cache(billed);
+      const { order: billed, kots } = await actions.bill(order, drafts);
+      setDrafts([]);
+      printKots(kots);
       printHtml(billHtml(billed, { ...header, footer: menu.outlet.settings.billFooter }));
     });
 
@@ -147,26 +133,14 @@ export function OrderScreen({
       setPanel('pay');
     });
 
-  const patch = (body: object) =>
+  const patch = (body: Parameters<typeof actions.update>[1]) =>
     run('patch', async () => {
-      cache(await api<Order>(`/orders/${orderId}`, { method: 'PATCH', body }));
+      await actions.update(order, body);
       setPanel(null);
     });
 
   const changeQty = (item: OrderItem, quantity: number) =>
-    run('qty', async () => {
-      const updated =
-        quantity <= 0
-          ? await api<Order>(`/orders/${orderId}/items/${item.id}/cancel`, {
-              method: 'POST',
-              body: {},
-            })
-          : await api<Order>(`/orders/${orderId}/items/${item.id}`, {
-              method: 'PATCH',
-              body: { quantity },
-            });
-      cache(updated);
-    });
+    run('qty', () => actions.setQuantity(order, item, quantity));
 
   function addDraft(item: PosItem, pick: Pick) {
     setPicking(null);
@@ -493,8 +467,8 @@ export function OrderScreen({
         total={bill.total}
         open={panel === 'pay'}
         onClose={() => setPanel(null)}
+        onPay={(payments) => actions.pay(order, payments)}
         onPaid={(paid, change, print) => {
-          cache(paid);
           setPanel(null);
           if (print)
             printHtml(billHtml(paid, { ...header, footer: menu.outlet.settings.billFooter }));
@@ -510,13 +484,13 @@ export function OrderScreen({
         onClose={() => setPanel(null)}
         onSave={(body) =>
           run('discount', async () => {
-            cache(await api<Order>(`/orders/${orderId}/discount`, { method: 'PUT', body }));
+            await actions.setDiscount(order, body);
             setPanel(null);
           })
         }
         onRemove={() =>
           run('discount', async () => {
-            cache(await api<Order>(`/orders/${orderId}/discount`, { method: 'DELETE' }));
+            await actions.setDiscount(order, null);
             setPanel(null);
           })
         }
@@ -552,7 +526,7 @@ export function OrderScreen({
         onClose={() => setPanel(null)}
         onConfirm={(reason) =>
           run('void', async () => {
-            await api(`/orders/${orderId}/void`, { method: 'POST', body: { reason } });
+            await actions.voidOrder(order, reason);
             setDrafts([]);
             setPanel(null);
             onClose();
@@ -569,9 +543,7 @@ export function OrderScreen({
         onClose={() => setPanel(null)}
         onConfirm={(reason) =>
           run('reopen', async () => {
-            cache(
-              await api<Order>(`/orders/${orderId}/reopen`, { method: 'POST', body: { reason } }),
-            );
+            await actions.reopen(order, reason);
             setPanel(null);
           })
         }
@@ -586,12 +558,7 @@ export function OrderScreen({
         onClose={() => setCancelling(null)}
         onConfirm={(reason) =>
           run('cancel', async () => {
-            cache(
-              await api<Order>(`/orders/${orderId}/items/${cancelling!.id}/cancel`, {
-                method: 'POST',
-                body: { reason },
-              }),
-            );
+            await actions.cancelSent(order, cancelling!, reason);
             setCancelling(null);
           })
         }

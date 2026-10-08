@@ -9,6 +9,9 @@ export interface AuthUser {
   permissions: string[];
   /** null means every outlet of the business */
   outletIds: string[] | null;
+  /** set on a registered till; offline numbers use its code */
+  deviceId: string | null;
+  deviceCode: string | null;
 }
 
 export const IS_PUBLIC = 'isPublic';

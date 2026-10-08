@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { readSessionToken } from './cookies';
+import { DEVICE_COOKIE, readSessionToken } from './cookies';
 import { IS_PUBLIC, PERMISSIONS_KEY } from './decorators';
 import { SessionsService } from './sessions.service';
 
@@ -23,7 +23,7 @@ export class AuthGuard implements CanActivate {
 
     const req = ctx.switchToHttp().getRequest();
     const token = readSessionToken(req);
-    const user = token ? await this.sessions.resolve(token) : null;
+    const user = token ? await this.sessions.resolve(token, req.cookies?.[DEVICE_COOKIE]) : null;
     if (!user) throw new UnauthorizedException();
 
     req.user = user;

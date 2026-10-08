@@ -29,6 +29,7 @@ import { Logo } from '@/components/logo';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useSession } from '@/lib/session';
+import { forgetSession } from '@/offline/cache';
 import { OutletSwitcher } from './outlet-switcher';
 
 type NavItem = { href: string; label: string; icon: typeof House; permission?: Permission };
@@ -143,6 +144,7 @@ function SidebarContent() {
 
   async function logout() {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
+    await forgetSession();
     queryClient.clear();
     router.replace('/login');
   }

@@ -3,7 +3,8 @@
 import type { Permission } from '@pos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { api, ApiError } from './api';
+import { cachedApi } from '@/offline/cache';
+import { ApiError } from './api';
 import type { Me } from './types';
 
 const OUTLET_KEY = 'pos.outlet';
@@ -20,7 +21,7 @@ const SessionContext = createContext<Session | null>(null);
 export function useMeQuery() {
   return useQuery({
     queryKey: ['me'],
-    queryFn: () => api<Me>('/auth/me'),
+    queryFn: () => cachedApi<Me>('me', '/auth/me'),
     staleTime: 5 * 60_000,
   });
 }

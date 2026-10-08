@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -65,6 +66,14 @@ export class DevicesController {
   @HttpCode(204)
   revoke(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.devices.revoke(user, id);
+  }
+
+  @Get('devices/me')
+  me(@CurrentUser() user: AuthUser, @Query('date') date = '', @Query('fy') fy = '') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{4}-\d{2}$/.test(fy)) {
+      throw new BadRequestException('date and fy are required');
+    }
+    return this.devices.numbering(user, date, fy);
   }
 
   @Public()
