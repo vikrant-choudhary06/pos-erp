@@ -1,9 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray } from 'electron';
 import { cleanUrl, loadConfig, saveConfig, type Config } from './config';
 import { startHub, type Hub, type HubStatus } from './hub';
 import { printSilently } from './printing';
+import {
+  checkNow,
+  installNow,
+  startUpdates,
+  updateState,
+  updatesEnabled,
+  type UpdateState,
+} from './updates';
 
 // The counter PC runs this app. It opens the POS in its own window and runs
 // the hub the shop's tablets connect to, so billing carries on across all of
@@ -18,6 +26,7 @@ let main: BrowserWindow | null = null;
 let settings: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let announced = '';
 
 const logFile = () => path.join(app.getPath('userData'), 'hub.log');
 function log(message: string) {
@@ -33,8 +42,18 @@ if (!app.requestSingleInstanceLock()) {
 
 async function start() {
   Menu.setApplicationMenu(null);
+  // Windows needs this for notifications to show and be clickable
+  app.setAppUserModelId('in.rizzoto.pos');
+  log(`Rizzoto ${app.getVersion()} starting`);
   config = loadConfig();
   createTray();
+  startUpdates({
+    log,
+    onChange: showUpdate,
+    beforeInstall: () => {
+      quitting = true;
+    },
+  });
   if (!config.cloudUrl) return openSettings();
   await runHub();
   showMain();
@@ -74,6 +93,37 @@ function showStatus(status: HubStatus) {
   tray?.setToolTip(`Rizzoto: ${label}`);
   main?.setTitle(`Rizzoto (${label})`);
   settings?.webContents.send('hub:status', status);
+}
+
+function showUpdate(update: UpdateState) {
+  settings?.webContents.send('update:status', update);
+  buildTrayMenu();
+  if (update.state !== 'ready' || announced === update.version) return;
+  announced = update.version;
+  if (!Notification.isSupported()) return;
+  const note = new Notification({
+    title: `Rizzoto ${update.version} is ready`,
+    body: 'It installs the next time Rizzoto starts. Click to restart now.',
+    icon: path.join(assets, 'icon.png'),
+  });
+  note.on('click', confirmRestart);
+  note.show();
+}
+
+async function confirmRestart() {
+  const update = updateState();
+  if (update.state !== 'ready') return;
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'Rizzoto',
+    message: `Restart now to update to ${update.version}?`,
+    detail:
+      'Takes about 15 seconds. Open orders are kept; tablets reconnect on their own. Items not yet sent to the kitchen on this screen will need adding again.',
+    buttons: ['Restart now', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) installNow();
 }
 
 function showMain() {
@@ -166,10 +216,18 @@ function createTray() {
   tray = new Tray(path.join(assets, 'tray.png'));
   tray.setToolTip('Rizzoto');
   tray.on('click', showMain);
-  tray.setContextMenu(
+  buildTrayMenu();
+}
+
+function buildTrayMenu() {
+  const update = updateState();
+  tray?.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open POS', click: showMain },
       { label: 'Settings', click: openSettings },
+      ...(update.state === 'ready'
+        ? [{ label: `Restart to update (${update.version})`, click: confirmRestart }]
+        : []),
       { type: 'separator' },
       {
         label: 'Quit (tablets stop working offline)',
@@ -208,7 +266,12 @@ ipcMain.handle('settings:load', () => ({
   config,
   status: hub?.status() ?? null,
   version: app.getVersion(),
+  update: updateState(),
+  updates: updatesEnabled(),
 }));
+
+ipcMain.handle('update:check', () => checkNow());
+ipcMain.handle('update:install', () => confirmRestart());
 
 ipcMain.handle('settings:printers', async () => {
   const win = main ?? settings;

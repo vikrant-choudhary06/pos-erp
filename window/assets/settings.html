@@ -39,6 +39,7 @@
       li small { color: #b42318; display: block; }
       .error { color: #b42318; margin-top: 12px; min-height: 20px; }
       footer { display: flex; justify-content: end; gap: 8px; margin-top: 20px; }
+      .update { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -76,6 +77,12 @@
       </div>
 
       <label class="check"><input type="checkbox" name="startWithWindows" /> Start with Windows</label>
+
+      <h2>Updates</h2>
+      <div class="update">
+        <p id="updateText">Version</p>
+        <button type="button" id="updateButton" hidden>Check now</button>
+      </div>
 
       <div id="failedBox" hidden>
         <h2>Not synced</h2>
