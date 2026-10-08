@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter api build
+      - run: pnpm --filter web build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pos
+          POSTGRES_DB: pos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pos" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://pos:pos@localhost:5432/pos
+      WEB_URL: http://localhost:3000
+      OTP_SECRET: ci-only-secret-not-used-anywhere-else
+      DEV_LOGIN_CODE: "111111"
+      API_URL: http://localhost:4000
+      NEXT_OUTPUT: standalone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter api db:deploy
+      - run: pnpm --filter @pos/shared build && pnpm --filter api build && pnpm --filter web build
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Start servers
+        run: |
+          # the standalone server expects static assets next to it
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          (cd apps/api && PORT=4000 node dist/main > ../../api.log 2>&1 &)
+          (cd apps/web/.next/standalone && PORT=3000 node apps/web/server.js > ../../../../web.log 2>&1 &)
+          npx --yes wait-on -t 60000 http://localhost:4000/api/health http://localhost:3000
+      - run: pnpm e2e
+        env:
+          CI: "true"
+      - if: failure()
+        run: tail -n 100 api.log web.log
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: apps/web/test-results

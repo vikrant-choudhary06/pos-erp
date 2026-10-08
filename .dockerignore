@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/.env
+**/.env.local
+**/test-results
+**/playwright-report
+.git
+.claude
+docker-compose*.yml

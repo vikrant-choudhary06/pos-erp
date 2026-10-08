@@ -1,0 +1,46 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
+
+@Injectable()
+export class MailService {
+  private readonly logger = new Logger(MailService.name);
+  private readonly resend: Resend | null;
+  private readonly from: string;
+
+  constructor(config: ConfigService) {
+    const key = config.get<string>('RESEND_API_KEY');
+    this.resend = key ? new Resend(key) : null;
+    this.from = config.get('MAIL_FROM') ?? 'POS <onboarding@resend.dev>';
+  }
+
+  async sendLoginCode(to: string, code: string) {
+    if (!this.resend) {
+      // No key configured (local dev) — print it so we can still sign in.
+      this.logger.warn(`RESEND_API_KEY not set. Login code for ${to}: ${code}`);
+      return;
+    }
+
+    const { error } = await this.resend.emails.send({
+      from: this.from,
+      to,
+      subject: `${code} is your login code`,
+      text: `Your login code is ${code}. It expires in 10 minutes.\n\nIf you didn't try to sign in, you can ignore this email.`,
+      html: loginCodeHtml(code),
+    });
+
+    if (error) {
+      this.logger.error(`Could not send login code to ${to}: ${error.message}`);
+      throw new Error('Email could not be sent');
+    }
+  }
+}
+
+function loginCodeHtml(code: string) {
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;margin:0 auto;padding:32px 24px;color:#1c1917">
+    <p style="margin:0 0 24px;font-size:15px">Use this code to sign in:</p>
+    <p style="margin:0 0 24px;font-size:32px;letter-spacing:8px;font-weight:600">${code}</p>
+    <p style="margin:0;font-size:13px;color:#78716c">It expires in 10 minutes. If you didn't try to sign in, ignore this email.</p>
+  </div>`;
+}

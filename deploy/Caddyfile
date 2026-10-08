@@ -1,0 +1,14 @@
+{$DOMAIN} {
+	# live order updates are a long-lived stream: no compression, no buffering
+	@events path /api/events*
+	handle @events {
+		reverse_proxy web:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy web:3000
+	}
+}

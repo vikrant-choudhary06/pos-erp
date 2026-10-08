@@ -1,0 +1,22 @@
+{
+  "name": "pos-erp",
+  "private": true,
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "predev": "pnpm --filter @pos/shared build",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @pos/shared build && pnpm --filter api exec tsc --noEmit && pnpm --filter web exec tsc --noEmit",
+    "test": "pnpm --filter @pos/shared test",
+    "e2e": "pnpm --filter web e2e",
+    "format": "prettier --write \"apps/*/src/**/*.{ts,tsx,css}\" \"apps/web/e2e/**/*.ts\" \"packages/shared/{src,test}/**/*.ts\"",
+    "db:up": "docker compose up -d",
+    "db:migrate": "pnpm --filter api db:migrate"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.0"
+  }
+}
