@@ -65,7 +65,7 @@ test('a till keeps billing offline and syncs when the connection is back', async
   await page.getByRole('button', { name: /Filter Coffee/ }).click();
   await page.getByRole('button', { name: /Filter Coffee/ }).click();
   // 2 × 100 + 5% GST
-  await expect(page.getByText('₹210').first()).toBeVisible();
+  await expect(page.getByText('₹210').filter({ visible: true }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Send KOT' }).click();
   await expect(page.getByText('KOT #D1-K1 sent')).toBeVisible();

@@ -133,7 +133,8 @@ export default function KitchenPage() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+      {/* a phone scrolls down through the tickets, bigger screens fill columns sideways */}
+      <main className="min-h-0 flex-1 overflow-y-auto sm:overflow-x-auto sm:overflow-y-hidden">
         {tickets.isLoading ? (
           <div className="grid h-full place-items-center text-ink-faint">
             <Spinner />
@@ -141,7 +142,7 @@ export default function KitchenPage() {
         ) : list.length === 0 ? (
           <div className="grid h-full place-items-center text-sm text-ink-faint">All caught up</div>
         ) : (
-          <div className="flex h-full flex-col flex-wrap content-start gap-3 p-4">
+          <div className="flex flex-col gap-3 p-4 sm:h-full sm:flex-wrap sm:content-start">
             <AnimatePresence initial={false} mode="popLayout">
               {list.map((kot) => {
                 const minutes = Math.floor((now - new Date(kot.createdAt).getTime()) / 60_000);
@@ -156,7 +157,7 @@ export default function KitchenPage() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                     className={cn(
-                      'flex max-h-full w-64 flex-col overflow-hidden rounded-2xl border bg-card',
+                      'flex w-full flex-col overflow-hidden rounded-2xl border bg-card sm:max-h-full sm:w-64',
                       kot.status === 'READY'
                         ? 'border-veg ring-2 ring-veg/30'
                         : late

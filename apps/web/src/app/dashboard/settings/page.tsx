@@ -97,13 +97,13 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="grid gap-5 lg:grid-cols-[240px_1fr]">
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
       <div className="flex items-start justify-between gap-4 lg:block">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold">{title}</h2>
           {description && <p className="mt-1 text-[13px] text-ink-soft">{description}</p>}
         </div>
-        {action && <div className="lg:mt-4">{action}</div>}
+        {action && <div className="shrink-0 lg:mt-4">{action}</div>}
       </div>
       <div>{children}</div>
     </section>

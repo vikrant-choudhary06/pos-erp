@@ -53,6 +53,7 @@ export function MenuPanel({
   const usedCategories = menu.categories.filter((c) =>
     menu.items.some((i) => i.categoryId === c.id),
   );
+  const tabs = [{ id: ALL, name: 'All' }, ...usedCategories];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -76,10 +77,30 @@ export function MenuPanel({
         </div>
       </div>
 
+      {/* phones and tablets: categories scroll sideways above the items */}
+      {!query && (
+        <nav className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-line px-3 py-2 lg:hidden">
+          {tabs.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCategory(c.id)}
+              className={cn(
+                'h-8 shrink-0 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors',
+                category === c.id
+                  ? 'bg-ink font-medium text-paper'
+                  : 'bg-black/[0.045] text-ink-soft hover:text-ink',
+              )}
+            >
+              {c.name}
+            </button>
+          ))}
+        </nav>
+      )}
+
       <div className="flex min-h-0 flex-1">
         {!query && (
-          <nav className="w-36 shrink-0 overflow-y-auto border-r border-line py-2 sm:w-44">
-            {[{ id: ALL, name: 'All' }, ...usedCategories].map((c) => (
+          <nav className="hidden w-44 shrink-0 overflow-y-auto border-r border-line py-2 lg:block">
+            {tabs.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setCategory(c.id)}
@@ -103,7 +124,7 @@ export function MenuPanel({
               {query ? 'Nothing matches' : 'No items in this category'}
             </p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
               {items.map((item) => {
                 const prices = item.hasVariants
                   ? item.variants.map((v) => priceOf(item, v.id, orderType))

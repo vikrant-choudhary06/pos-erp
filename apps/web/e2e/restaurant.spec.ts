@@ -79,7 +79,7 @@ test('a new restaurant can sign up, bill an order and see it in reports', async 
     await dialog(page).getByRole('button', { name: /^Add/ }).click();
 
     // 280 + 5% GST
-    await expect(page.getByText('₹294').first()).toBeVisible();
+    await expect(page.getByText('₹294').filter({ visible: true }).first()).toBeVisible();
     await page.getByRole('button', { name: 'Send KOT' }).click();
     await expect(page.getByText(/KOT #\d+ sent/)).toBeVisible();
 
@@ -106,7 +106,7 @@ test('a new restaurant can sign up, bill an order and see it in reports', async 
     await page.goto('/dashboard/reports');
     await page.getByRole('button', { name: 'Today' }).click();
     await expect(page.getByText('Net sales')).toBeVisible();
-    await expect(page.getByText('₹294').first()).toBeVisible();
+    await expect(page.getByText('₹294').filter({ visible: true }).first()).toBeVisible();
 
     await page.getByRole('tab', { name: 'GST' }).click();
     await expect(page.getByText('CGST 2.5%')).toBeVisible();

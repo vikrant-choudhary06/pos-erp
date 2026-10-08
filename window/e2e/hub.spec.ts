@@ -116,7 +116,7 @@ test('tablets keep billing through the hub while the internet is down', async ({
   const table = counter.getByRole('button', { name: 'Table T1, order D1-1' });
   await expect(table).toBeVisible({ timeout: 30_000 });
   await table.click();
-  await expect(counter.getByText('₹210').first()).toBeVisible();
+  await expect(counter.getByText('₹210').filter({ visible: true }).first()).toBeVisible();
   await counter.getByRole('button', { name: /^Pay/ }).click();
   const pay = counter.locator('[role="dialog"]').last();
   await pay.getByRole('button', { name: '₹500' }).click();
