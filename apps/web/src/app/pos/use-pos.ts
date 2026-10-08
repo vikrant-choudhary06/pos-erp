@@ -1,13 +1,12 @@
 'use client';
 
-import { calculateBill, type OrderType } from '@pos/shared';
+import { calculateBill, orderEngine, type OrderType } from '@pos/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, isOffline } from '@/lib/api';
 import type { Order, PosItem, PosMenu, Shift } from '@/lib/pos-types';
 import { useSession } from '@/lib/session';
 import { cachedApi } from '@/offline/cache';
 import { db } from '@/offline/db';
-import { priceOf } from '@/offline/engine';
 import { isLocalMode } from '@/offline/state';
 
 export { useBillHeader } from '@/lib/use-bill-header';
@@ -88,7 +87,7 @@ export function useShift() {
   });
 }
 
-export { priceOf };
+export const priceOf = orderEngine.priceOf;
 
 export type Draft = {
   key: string;

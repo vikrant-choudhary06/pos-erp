@@ -6,7 +6,8 @@ menu, tables, stock, purchases, staff and reports.
 ```
 apps/api        NestJS + Prisma (Postgres)
 apps/web        Next.js: landing page, dashboard, POS, kitchen display
-packages/shared bill maths, permissions, dates, constants shared by both
+packages/shared bill maths, permissions, dates and the order engine, shared by all of them
+window/         Windows app for the counter PC (Electron) with the shop's local hub
 deploy/         Caddyfile for the production stack
 ```
 
@@ -42,6 +43,28 @@ pnpm e2e              # browser test: sign up -> menu -> POS order -> kitchen ->
 `pnpm e2e` needs `pnpm dev` running with `DEV_LOGIN_CODE` set. The first run is slow because
 the dev server compiles each page on first visit. CI (`.github/workflows/ci.yml`) runs all
 three on every push against production builds.
+
+## Counter PC app (Windows)
+
+`window/` builds the installer `Counter-POS-Setup-<version>.exe`. Install it on the PC at the billing counter. On first
+start it asks for the web address of the account, then opens the POS full screen. It also runs
+a small server (the hub) on port 7400 that the shop's tablets and the kitchen screen use
+instead of the website: settings show the address to open, e.g. `http://192.168.1.20:7400/pos`.
+
+```bash
+pnpm desktop          # run it from source against the cloud you enter
+pnpm desktop:exe      # installer in window/release/
+pnpm --filter window test   # tablets + kitchen through the hub with the internet cut
+```
+
+While the internet works, the hub just passes everything through to the cloud. When it
+drops, the hub answers the POS and kitchen screens itself from its copy of the menu, open
+orders and sessions, numbers new orders and bills as till D1 (register the counter under
+Settings → POS devices once), and queues every change. When the connection is back the queue
+is replayed in order and the cloud's copy takes over again. Bills and KOTs print silently to
+the printers picked in the app's settings (Ctrl + , or the tray icon). Closing the window
+keeps the hub running in the tray. Without a screen, `node window/dist/hub-cli.js --cloud
+https://your-domain` runs only the hub.
 
 ## Deploying
 
@@ -87,7 +110,9 @@ docker compose -f docker-compose.prod.yml exec postgres pg_dump -U pos pos | gzi
   replayed in order through the normal API. Offline orders and bills carry the till's code
   (`D1-12`, `IND01/26-27/D1-00004`) so they never clash with server numbers. Anything the
   server refuses shows up as "not synced" on the till. Needs a connection: opening a shift,
-  reopening a bill, voiding after the KOT, credit sales, PIN switching.
+  reopening a bill, voiding after the KOT, credit sales, PIN switching. For several tablets
+  sharing orders offline, use the counter PC app above; the same order engine
+  (`packages/shared/src/order-engine.ts`) runs there.
 - **Audit.** Voids, discounts, item cancels, price changes, cash in/out and shift closes are
   written to `AuditLog`. Owners see them under Activity.
 
