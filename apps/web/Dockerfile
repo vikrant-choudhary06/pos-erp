@@ -13,6 +13,7 @@ ENV API_URL=$API_URL NEXT_OUTPUT=standalone NEXT_TELEMETRY_DISABLED=1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
+COPY window/package.json window/
 # every workspace manifest, or pnpm treats the lockfile as stale and resolves from scratch.
 # --trust-lockfile: it was already checked against supply-chain policy on the dev machine and in CI
 COPY apps/api/package.json apps/api/
