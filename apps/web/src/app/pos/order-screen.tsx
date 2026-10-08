@@ -434,7 +434,21 @@ export function OrderScreen({
             </Button>
           </div>
           {editable ? (
-            <MenuPanel menu={menu} orderType={order.type} onPick={onPick} />
+            <>
+              <div className="min-h-0 flex-1">
+                <MenuPanel menu={menu} orderType={order.type} onPick={onPick} />
+              </div>
+              {lineCount > 0 && bill && (
+                <div className="border-t border-line bg-paper p-3 md:hidden">
+                  <Button className="w-full justify-between" onClick={() => setView('ticket')}>
+                    <span>
+                      View order <span className="tabular opacity-60">· {lineCount}</span>
+                    </span>
+                    <span className="tabular">{formatMoney(bill.total)}</span>
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="grid flex-1 place-items-center px-8 text-center text-sm text-ink-soft">
               {order.status === 'BILLED'

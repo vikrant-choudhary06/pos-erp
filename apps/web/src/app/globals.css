@@ -44,6 +44,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* sideways rows (categories, date presets) still scroll, just without a bar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

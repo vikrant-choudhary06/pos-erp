@@ -39,14 +39,14 @@ export function DateRange({ value, onChange }: { value: Range; onChange: (r: Ran
   })?.value;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap rounded-[10px] bg-black/[0.045] p-[3px]">
+    <div className="flex max-w-full flex-wrap items-center gap-2">
+      <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-[10px] bg-black/[0.045] p-[3px]">
         {PRESETS.map((p) => (
           <button
             key={p.value}
             onClick={() => onChange(presetRange(p.value))}
             className={cn(
-              'h-8 rounded-[8px] px-3 text-[13px] transition-colors',
+              'h-8 shrink-0 rounded-[8px] px-3 text-[13px] whitespace-nowrap transition-colors',
               active === p.value
                 ? 'bg-card font-medium text-ink shadow-sm'
                 : 'text-ink-soft hover:text-ink',
