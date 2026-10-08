@@ -11,7 +11,9 @@ export class MailService {
   constructor(config: ConfigService) {
     const key = config.get<string>('RESEND_API_KEY');
     this.resend = key ? new Resend(key) : null;
-    this.from = config.get('MAIL_FROM') ?? 'Rizzoto <onboarding@resend.dev>';
+    // hosting dashboards keep quotes pasted from a .env file as part of the value
+    const from = String(config.get('MAIL_FROM') ?? '').trim().replace(/^(["'])(.*)$/, '$2');
+    this.from = from || 'Rizzoto <onboarding@resend.dev>';
   }
 
   async sendLoginCode(to: string, code: string) {
