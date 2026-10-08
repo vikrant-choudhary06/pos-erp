@@ -115,8 +115,8 @@ export function PayDialog({
                   className={cn(
                     'h-8 rounded-lg px-3 text-[13px] transition-colors',
                     row.method === m
-                      ? 'bg-ink text-white'
-                      : 'bg-black/[0.04] text-ink-soft hover:text-ink',
+                      ? 'bg-ink text-on-ink'
+                      : 'bg-ink/[0.04] text-ink-soft hover:text-ink',
                   )}
                 >
                   {PAYMENT_METHODS[m]}
@@ -197,7 +197,7 @@ export function PayDialog({
         )}
 
         {change > 0 && (
-          <div className="flex items-center justify-between rounded-xl bg-ink px-4 py-3 text-white">
+          <div className="flex items-center justify-between rounded-xl bg-ink px-4 py-3 text-on-ink">
             <span className="text-sm">Return change</span>
             <span className="tabular text-xl font-semibold">{formatMoney(change)}</span>
           </div>

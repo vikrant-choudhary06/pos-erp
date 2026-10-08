@@ -9,10 +9,10 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  primary: 'bg-ink text-white hover:bg-ink/85 disabled:bg-ink/40',
+  primary: 'bg-ink text-on-ink hover:bg-ink/85 disabled:bg-ink/40',
   secondary:
     'bg-card text-ink border border-line hover:border-line-strong hover:bg-paper disabled:text-ink-faint',
-  ghost: 'text-ink-soft hover:text-ink hover:bg-black/[0.04] disabled:text-ink-faint',
+  ghost: 'text-ink-soft hover:text-ink hover:bg-ink/[0.04] disabled:text-ink-faint',
   danger: 'bg-card text-danger border border-line hover:border-danger/40 hover:bg-danger/[0.04]',
 };
 

@@ -40,7 +40,7 @@ export function DateRange({ value, onChange }: { value: Range; onChange: (r: Ran
 
   return (
     <div className="flex max-w-full flex-wrap items-center gap-2">
-      <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-[10px] bg-black/[0.045] p-[3px]">
+      <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-[10px] bg-ink/[0.045] p-[3px]">
         {PRESETS.map((p) => (
           <button
             key={p.value}

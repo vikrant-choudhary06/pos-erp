@@ -59,10 +59,10 @@ export function SyncStatus() {
 
   if (!state.online) {
     return (
-      <span className="mr-1 inline-flex items-center gap-1.5 rounded-md bg-ink px-2 py-1 text-xs font-medium text-white">
+      <span className="mr-1 inline-flex items-center gap-1.5 rounded-md bg-ink px-2 py-1 text-xs font-medium text-on-ink">
         <CloudOff className="size-3.5" /> Offline
         {state.pending > 0 && (
-          <span className="tabular text-white/70">· {state.pending} waiting</span>
+          <span className="tabular text-on-ink/70">· {state.pending} waiting</span>
         )}
       </span>
     );
@@ -70,7 +70,7 @@ export function SyncStatus() {
 
   if (state.pending > 0) {
     return (
-      <span className="mr-1 inline-flex items-center gap-1.5 rounded-md bg-black/[0.05] px-2 py-1 text-xs text-ink-soft">
+      <span className="mr-1 inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-1 text-xs text-ink-soft">
         <RefreshCw className="size-3.5 animate-spin" /> Syncing {state.pending}
       </span>
     );

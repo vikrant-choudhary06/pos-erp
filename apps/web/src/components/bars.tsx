@@ -79,7 +79,7 @@ export function Shares({ data }: { data: { label: string; value: number; hint?: 
             </span>
             <span>{formatMoney(d.value)}</span>
           </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/[0.05]">
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
             <m.div
               className="h-full rounded-full bg-ink"
               initial={{ width: 0 }}

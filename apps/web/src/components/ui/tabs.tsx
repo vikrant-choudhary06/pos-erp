@@ -17,7 +17,7 @@ export function Tabs<T extends string>({ value, onChange, options, className }: 
   return (
     <div
       role="tablist"
-      className={cn('inline-flex rounded-[10px] bg-black/[0.045] p-[3px]', className)}
+      className={cn('inline-flex rounded-[10px] bg-ink/[0.045] p-[3px]', className)}
     >
       {options.map((option) => {
         const active = option.value === value;

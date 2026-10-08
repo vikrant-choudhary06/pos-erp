@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -11,12 +13,32 @@
   --color-ink: #1b1b19;
   --color-ink-soft: #5c5a55;
   --color-ink-faint: #a29f97;
+  /* text and marks sitting on an ink background */
+  --color-on-ink: #ffffff;
   --color-veg: #15803d;
   --color-nonveg: #b42318;
   --color-egg: #b45309;
   --color-danger: #c4320a;
 
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Same warm greys, turned down. Set by the toggle (lib/theme.ts) or the
+   system setting until someone picks one. */
+.dark {
+  --color-paper: #131312;
+  --color-card: #1c1c1a;
+  --color-line: #2a2927;
+  --color-line-strong: #3b3a36;
+  --color-ink: #ecebe6;
+  --color-ink-soft: #a9a69e;
+  --color-ink-faint: #6f6c66;
+  --color-on-ink: #131312;
+  --color-veg: #3fa45f;
+  --color-nonveg: #e2553f;
+  --color-egg: #d38a2c;
+  --color-danger: #ef6a43;
+  color-scheme: dark;
 }
 
 html {
@@ -31,7 +53,7 @@ body {
 
 ::selection {
   background: var(--color-ink);
-  color: #fff;
+  color: var(--color-on-ink);
 }
 
 :where(a, button, [role='tab'], [role='switch']):focus-visible {
@@ -50,6 +72,13 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* while the theme flips, nothing animates its colour on its own */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

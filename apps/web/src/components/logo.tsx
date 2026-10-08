@@ -11,11 +11,11 @@ export function LogoMark({ className }: { className?: string }) {
       <path
         d="M9 17v-5.5A3.5 3.5 0 0 1 12.5 8H14"
         fill="none"
-        stroke="white"
+        className="stroke-on-ink"
         strokeWidth="2.2"
         strokeLinecap="round"
       />
-      <circle cx="16" cy="16.2" r="1.3" fill="white" />
+      <circle cx="16" cy="16.2" r="1.3" className="fill-on-ink" />
     </svg>
   );
 }

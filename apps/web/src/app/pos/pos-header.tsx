@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { APP_NAME, LogoMark } from '@/components/logo';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { forgetSession } from '@/offline/cache';
@@ -49,16 +50,18 @@ export function PosHeader({ onHome }: { onHome: () => void }) {
         {can('kitchen.view') && (
           <Link
             href="/kitchen"
-            className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[13px] text-ink-soft hover:bg-black/[0.04] hover:text-ink"
+            className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[13px] text-ink-soft hover:bg-ink/[0.04] hover:text-ink"
           >
             <ChefHat className="size-4" /> <span className="hidden sm:inline">Kitchen</span>
           </Link>
         )}
 
+        <ThemeToggle />
+
         <div ref={ref} className="relative">
           <button
             onClick={() => setOpen(!open)}
-            className="flex h-9 items-center gap-2 rounded-lg pr-1 pl-2 hover:bg-black/[0.04]"
+            className="flex h-9 items-center gap-2 rounded-lg pr-1 pl-2 hover:bg-ink/[0.04]"
           >
             <span className="hidden text-right sm:block">
               <span className="block text-[13px] leading-tight font-medium">{me.user.name}</span>
@@ -66,7 +69,7 @@ export function PosHeader({ onHome }: { onHome: () => void }) {
                 {me.user.role.name}
               </span>
             </span>
-            <span className="grid size-7 place-items-center rounded-full bg-ink text-xs font-medium text-white">
+            <span className="grid size-7 place-items-center rounded-full bg-ink text-xs font-medium text-on-ink">
               {me.user.name.slice(0, 1).toUpperCase()}
             </span>
           </button>
