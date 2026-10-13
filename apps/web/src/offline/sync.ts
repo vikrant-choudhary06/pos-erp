@@ -3,12 +3,20 @@ import { api, ApiError, isOffline } from '@/lib/api';
 import type { Order } from '@/lib/pos-types';
 import { db, type Mutation } from './db';
 import { getOfflineState, setOfflineState } from './state';
+import { offlineIdentity } from './cache';
 
 // Replies that mean "this already happened", which is fine when replaying
 const ALREADY_DONE = ['Nothing new to send to the kitchen', 'Already voided'];
 
 export async function enqueue(mutation: Omit<Mutation, 'status' | 'createdAt'>) {
-  await db().outbox.add({ ...mutation, status: 'pending', createdAt: new Date().toISOString() });
+  const me = await offlineIdentity();
+  await db().outbox.add({
+    ...mutation,
+    userId: me.user.id,
+    tenantId: me.business.id,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  });
   await refreshCounts();
 }
 
@@ -36,6 +44,21 @@ export async function flush(queryClient: QueryClient) {
     for (;;) {
       const next = await db().outbox.where('status').equals('pending').first();
       if (!next) break;
+      if (!next.userId || !next.tenantId) {
+        await db().outbox.update(next.seq!, {
+          status: 'failed',
+          error:
+            'This work predates session tracking. Review it against the server before re-entering it.',
+        });
+        continue;
+      }
+      let me;
+      try {
+        me = await offlineIdentity();
+      } catch {
+        break;
+      }
+      if (next.userId !== me.user.id || next.tenantId !== me.business.id) break;
 
       try {
         const result = await api<unknown>(next.path, { method: next.method, body: next.body });
@@ -43,6 +66,7 @@ export async function flush(queryClient: QueryClient) {
         await keepServerCopy(next.orderId, result);
       } catch (err) {
         if (isOffline(err)) break;
+        if (err instanceof ApiError && err.status === 401) break;
         if (err instanceof ApiError && err.status >= 500) break;
 
         const message = err instanceof Error ? err.message : 'Could not sync';

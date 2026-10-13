@@ -1,6 +1,7 @@
 appId: in.rizzoto.pos
 productName: Rizzoto
 copyright: Rizzoto
+forceCodeSigning: true
 directories:
   output: release
 files:
@@ -10,6 +11,9 @@ files:
   - assets/**
   - package.json
 win:
+  signtoolOptions:
+    publisherName: ${env.RIZZOTO_UPDATE_PUBLISHER}
+  verifyUpdateCodeSignature: true
   icon: assets/icon.ico
   target:
     - target: nsis

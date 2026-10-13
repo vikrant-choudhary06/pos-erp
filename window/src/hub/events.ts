@@ -7,17 +7,18 @@ type Event = { type: 'order' | 'kot' | 'table' | 'shift'; id?: string };
  * so the tills and kitchen screen refresh exactly as they do online.
  */
 export class LocalEvents {
-  private clients = new Map<ServerResponse, string>();
+  private clients = new Map<ServerResponse, { outletId: string; authorize: () => void }>();
   private ping = setInterval(() => this.write(() => true, { type: 'ping' }), 25_000);
 
-  attach(res: ServerResponse, outletId: string) {
+  attach(res: ServerResponse, outletId: string, authorize: () => void) {
+    authorize();
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache, no-transform',
       connection: 'keep-alive',
     });
     res.write(': hub\n\n');
-    this.clients.set(res, outletId);
+    this.clients.set(res, { outletId, authorize });
     res.on('close', () => this.clients.delete(res));
   }
 
@@ -38,6 +39,15 @@ export class LocalEvents {
 
   private write(match: (outletId: string) => boolean, event: object) {
     const line = `data: ${JSON.stringify(event)}\n\n`;
-    for (const [res, outletId] of this.clients) if (match(outletId)) res.write(line);
+    for (const [res, { outletId, authorize }] of this.clients) {
+      try {
+        authorize();
+      } catch {
+        res.end();
+        this.clients.delete(res);
+        continue;
+      }
+      if (match(outletId)) res.write(line);
+    }
   }
 }

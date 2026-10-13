@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Kot, Order, PosMenu } from '@pos/shared';
+import type { Protection } from './protection';
 
 // Everything the hub needs to keep the shop running without the cloud lives
 // in one JSON file. It is small (today's orders, a few cached replies, the
@@ -42,6 +43,8 @@ type Data = {
   seq: number;
   /** local KOT id -> the id the cloud gave it */
   kotIds: Record<string, string>;
+  revocations: string[];
+  revokedSessions: Record<string, true>;
 };
 
 const EMPTY: Data = {
@@ -55,6 +58,8 @@ const EMPTY: Data = {
   failed: [],
   seq: 0,
   kotIds: {},
+  revocations: [],
+  revokedSessions: {},
 };
 
 export class Store {
@@ -62,10 +67,27 @@ export class Store {
   private file: string;
   private timer: NodeJS.Timeout | null = null;
 
-  constructor(dir: string) {
-    fs.mkdirSync(dir, { recursive: true });
+  constructor(
+    dir: string,
+    private protection: Protection,
+  ) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     this.file = path.join(dir, 'hub.json');
-    this.data = { ...EMPTY, ...read(this.file) };
+    this.data = structuredClone(EMPTY);
+    // Recover a completed first write if power failed before the rename.
+    if (!fs.existsSync(this.file) && fs.existsSync(`${this.file}.tmp`))
+      fs.renameSync(`${this.file}.tmp`, this.file);
+    if (fs.existsSync(this.file)) {
+      const bytes = fs.readFileSync(this.file);
+      const encrypted = bytes.subarray(0, 4).toString() === 'RZH1';
+      // A failed decrypt must never silently reset orders or numbering.
+      const plain = encrypted ? protection.decrypt(bytes.subarray(4)) : bytes.toString('utf8');
+      this.data = { ...this.data, ...JSON.parse(plain) };
+      if (!encrypted) this.flush();
+    }
+    // Remove the legacy plaintext scratch file only after securing the main copy.
+    const scratch = `${this.file}.tmp`;
+    if (fs.existsSync(scratch)) fs.unlinkSync(scratch);
   }
 
   save() {
@@ -77,7 +99,8 @@ export class Store {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     const tmp = `${this.file}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(this.data));
+    const encrypted = this.protection.encrypt(JSON.stringify(this.data));
+    fs.writeFileSync(tmp, Buffer.concat([Buffer.from('RZH1'), encrypted]), { mode: 0o600 });
     fs.renameSync(tmp, this.file);
   }
 
@@ -107,13 +130,5 @@ export class Store {
     // a printed number must never be handed out twice, even after a crash
     this.flush();
     return value;
-  }
-}
-
-function read(file: string): Partial<Data> {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return {};
   }
 }

@@ -22,7 +22,9 @@ export function useMeQuery() {
   return useQuery({
     queryKey: ['me'],
     queryFn: () => cachedApi<Me>('me', '/auth/me'),
-    staleTime: 5 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 }
 

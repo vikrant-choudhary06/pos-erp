@@ -10,7 +10,7 @@
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm --filter @pos/shared build && pnpm --filter api exec tsc --noEmit && pnpm --filter web exec tsc --noEmit && pnpm --filter window exec tsc --noEmit",
-    "test": "pnpm --filter @pos/shared test",
+    "test": "pnpm --filter @pos/shared build && pnpm --filter @pos/shared test && pnpm --filter api test && pnpm --filter window test:security",
     "e2e": "pnpm --filter web e2e",
     "desktop": "pnpm --filter window start",
     "desktop:exe": "pnpm --filter window dist",

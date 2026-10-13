@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { isUnauthorized, SessionProvider, useMeQuery } from '@/lib/session';
+import { sessionLocked } from '@/offline/session-lock';
 
 /** Loads the signed-in user, or sends them to `signInPath`. */
 export function SessionGate({
@@ -15,12 +16,27 @@ export function SessionGate({
 }) {
   const router = useRouter();
   const { data: me, error } = useMeQuery();
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
-    if (isUnauthorized(error)) router.replace(signInPath);
-  }, [error, router, signInPath]);
+    const check = () =>
+      setBlocked(sessionLocked() || (!!me && !(Date.parse(me.offlineExpiresAt) > Date.now())));
+    check();
+    const timer = setInterval(check, 1000);
+    window.addEventListener('storage', check);
+    window.addEventListener('pos-session-change', check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('storage', check);
+      window.removeEventListener('pos-session-change', check);
+    };
+  }, [me]);
 
-  if (!me) {
+  useEffect(() => {
+    if (blocked || isUnauthorized(error)) router.replace(signInPath);
+  }, [blocked, error, router, signInPath]);
+
+  if (!me || blocked || isUnauthorized(error)) {
     return (
       <div className="grid min-h-dvh place-items-center text-ink-faint">
         {error && !isUnauthorized(error) ? (

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,17 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       <div className="space-y-10">
+        <Section
+          title="Hotel module"
+          description="Rooms, reservations, guest accounts and housekeeping for an outlet."
+        >
+          <Link
+            href="/dashboard/hotel"
+            className="inline-flex rounded-lg border border-line bg-card px-4 py-3 text-sm"
+          >
+            Set up or open hotel
+          </Link>
+        </Section>
         <Section title="Business" description="Shown on bills and invoices.">
           <BusinessForm />
         </Section>

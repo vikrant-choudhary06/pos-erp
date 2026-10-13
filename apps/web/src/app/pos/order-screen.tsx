@@ -28,6 +28,10 @@ import type { Kot, Order, OrderItem, PosItem, PosMenu } from '@/lib/pos-types';
 import { billHtml, kotHtml, printHtml } from '@/lib/print';
 import { useSession } from '@/lib/session';
 import { CustomerDialog, DiscountDialog, MoveTableDialog, ReasonDialog } from './dialogs';
+import { ChargeRoomSheet } from '@/components/pms/charge-room-sheet';
+import { api } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { isLocalMode } from '@/offline/state';
 import { ItemPicker, type Pick } from './item-picker';
 import { MenuPanel } from './menu-panel';
 import { PayDialog } from './pay-dialog';
@@ -41,7 +45,7 @@ import {
 } from './use-pos';
 import { usePosActions } from './actions';
 
-type Panel = 'pay' | 'discount' | 'guest' | 'move' | 'void' | 'reopen' | 'leave' | null;
+type Panel = 'pay' | 'discount' | 'guest' | 'move' | 'void' | 'reopen' | 'leave' | 'room' | null;
 
 export function OrderScreen({
   orderId,
@@ -53,6 +57,7 @@ export function OrderScreen({
   onClose: () => void;
 }) {
   const { can } = useSession();
+  const queryClient = useQueryClient();
   const { data: order } = useOrder(orderId);
   const active = useActiveOrders();
   const actions = usePosActions(menu);
@@ -80,7 +85,7 @@ export function OrderScreen({
   }
 
   const editable = order.status === 'OPEN';
-  const closed = order.status === 'PAID' || order.status === 'VOID';
+  const closed = order.status === 'PAID' || order.status === 'CHARGED' || order.status === 'VOID';
   const pending = order.items.filter((i) => i.status === 'PENDING');
   const hasUnsent = drafts.length > 0 || pending.length > 0;
   const lineCount =
@@ -218,6 +223,23 @@ export function OrderScreen({
                   <MenuItem onClick={() => setPanel('move')}>Move table</MenuItem>
                 )}
                 {!closed && <MenuItem onClick={() => setPanel('guest')}>Guest & notes</MenuItem>}
+                {order.status === 'BILLED' &&
+                  Number(order.paidTotal) === 0 &&
+                  can('bill.settle') &&
+                  can('hotel.billing') &&
+                  can('hotel.view') && (
+                    <MenuItem
+                      onClick={() => {
+                        if (isLocalMode())
+                          return toast.error(
+                            'Charging a room requires an internet connection and completed sync',
+                          );
+                        setPanel('room');
+                      }}
+                    >
+                      Charge to room
+                    </MenuItem>
+                  )}
                 <MenuItem
                   onClick={() =>
                     printHtml(
@@ -231,6 +253,7 @@ export function OrderScreen({
                   <MenuItem onClick={() => setPanel('reopen')}>Reopen bill</MenuItem>
                 )}
                 {order.status !== 'VOID' &&
+                  order.status !== 'CHARGED' &&
                   (can('bill.void') || order.items.every((i) => i.status === 'PENDING')) && (
                     <MenuItem danger onClick={() => setPanel('void')}>
                       {order.items.length ? 'Void order' : 'Cancel order'}
@@ -399,6 +422,27 @@ export function OrderScreen({
 
   return (
     <div className="flex h-full flex-col">
+      {panel === 'room' && (
+        <ChargeRoomSheet
+          outletId={order.outletId}
+          onClose={() => setPanel(null)}
+          onCharge={async (reservationId) => {
+            const charged = await run('room', () =>
+              api<Order>(`/orders/${order.id}/charge-room`, {
+                method: 'POST',
+                body: { reservationId },
+              }),
+            );
+            if (charged) {
+              queryClient.setQueryData(['order', order.id], charged);
+              await queryClient.invalidateQueries({ queryKey: ['orders-active'] });
+              setPanel(null);
+              toast.success('Bill transferred to guest account');
+              onClose();
+            }
+          }}
+        />
+      )}
       <div className="flex items-center gap-2 border-b border-line bg-paper px-3 py-2 md:hidden">
         <button
           onClick={leave}

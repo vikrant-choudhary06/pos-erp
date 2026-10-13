@@ -7,6 +7,8 @@ import { OtpService } from './otp.service';
 import { ClientMeta, SessionsService } from './sessions.service';
 
 export const SIGNUP_TTL_MS = 30 * 60 * 1000;
+const MAX_PASSWORD_FAILURES = 5;
+const PASSWORD_LOCK_MS = 5 * 60_000;
 
 @Injectable()
 export class AuthService {
@@ -59,14 +61,45 @@ export class AuthService {
     });
     if (!tenant || tenant.deletedAt) throw invalid;
 
-    const user = await this.prisma.user.findUnique({
-      where: { tenantId_employeeCode: { tenantId: tenant.id, employeeCode: input.employeeCode } },
-    });
-    if (!user?.passwordHash || user.deletedAt) throw invalid;
+    // The row lock makes the attempt limit apply across requests and API instances.
+    const user = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`
+        SELECT id FROM "User"
+        WHERE "tenantId" = ${tenant.id}::uuid AND "employeeCode" = ${input.employeeCode}
+        FOR UPDATE
+      `;
+        const account = await tx.user.findUnique({
+          where: {
+            tenantId_employeeCode: { tenantId: tenant.id, employeeCode: input.employeeCode },
+          },
+        });
+        if (!account?.passwordHash || account.deletedAt || account.status !== 'ACTIVE') return null;
 
-    const ok = await bcrypt.compare(input.password, user.passwordHash);
-    if (!ok) throw invalid;
-    if (user.status !== 'ACTIVE') throw new ForbiddenException('This account has been deactivated');
+        const locked = account.passwordLockedAt;
+        if (locked && Date.now() - locked.getTime() < PASSWORD_LOCK_MS) return null;
+
+        if (!(await bcrypt.compare(input.password, account.passwordHash))) {
+          const failures = locked ? 1 : account.passwordFailures + 1;
+          await tx.user.update({
+            where: { id: account.id },
+            data: {
+              passwordFailures: failures,
+              passwordLockedAt: failures >= MAX_PASSWORD_FAILURES ? new Date() : null,
+            },
+          });
+          return null;
+        }
+
+        await tx.user.update({
+          where: { id: account.id },
+          data: { passwordFailures: 0, passwordLockedAt: null },
+        });
+        return account;
+      },
+      { timeout: 10_000 },
+    );
+    if (!user) throw invalid;
 
     return this.sessions.create(user, meta);
   }
@@ -98,6 +131,9 @@ export class AuthService {
     });
 
     return {
+      offlineExpiresAt: new Date(
+        Math.min(Date.parse(auth.expiresAt ?? '') || Date.now(), Date.now() + 12 * 60 * 60 * 1000),
+      ).toISOString(),
       user: {
         id: user.id,
         name: user.name,

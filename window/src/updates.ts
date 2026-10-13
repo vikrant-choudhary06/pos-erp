@@ -1,5 +1,7 @@
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 // The counter PC keeps itself up to date. A new version downloads in the
 // background while the shop works; it is installed
@@ -11,9 +13,9 @@ import { autoUpdater } from 'electron-updater';
 
 // Releases live on a public GitHub repo ("owner/repo"), set at build time
 // (build.mjs) from RIZZOTO_UPDATE_REPO. Local builds have none and never look
-// for updates. RIZZOTO_UPDATE_HOST points at a stand-in server for testing.
+// for updates. Release builds also pin the code signing certificate publisher.
 const REPO = process.env.RIZZOTO_UPDATE_REPO ?? '';
-const HOST = process.env.RIZZOTO_UPDATE_HOST ?? '';
+const PUBLISHER = process.env.RIZZOTO_UPDATE_PUBLISHER ?? '';
 
 const CHECK_EVERY = 4 * 60 * 60_000;
 // an update found ready this soon after launch was downloaded last time
@@ -37,10 +39,11 @@ type Options = {
 let state: UpdateState = { state: 'off' };
 let options: Options;
 let downloadedNow = false;
+let enabled = false;
 const launchedAt = Date.now();
 
 export const updateState = () => state;
-export const updatesEnabled = () => app.isPackaged && /^[\w.-]+\/[\w.-]+$/.test(REPO);
+export const updatesEnabled = () => enabled;
 
 function set(next: UpdateState) {
   state = next;
@@ -49,17 +52,38 @@ function set(next: UpdateState) {
 
 export function startUpdates(opts: Options) {
   options = opts;
-  if (!updatesEnabled()) return;
+  enabled = false;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  if (!app.isPackaged || !PUBLISHER || !/^[\w.-]+\/[\w.-]+$/.test(REPO)) return;
 
   const [owner, repo] = REPO.split('/');
+  const configPath = path.join(__dirname, 'trusted-update.json');
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (
+      config.provider !== 'github' ||
+      config.owner !== owner ||
+      config.repo !== repo ||
+      config.publisherName?.length !== 1 ||
+      config.publisherName[0] !== PUBLISHER
+    ) {
+      throw new Error('Update publisher configuration does not match this build');
+    }
+    autoUpdater.updateConfigPath = configPath;
+  } catch (error) {
+    opts.log(`Updates disabled: ${error instanceof Error ? error.message : String(error)}`);
+    set({ state: 'error', message: 'The update signature configuration is missing or invalid.' });
+    return;
+  }
   autoUpdater.setFeedURL({
     provider: 'github',
     owner,
     repo,
-    ...(HOST && { host: HOST, protocol: 'http' as const }),
   });
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  enabled = true;
   autoUpdater.disableWebInstaller = true;
   autoUpdater.logger = {
     info: (m: unknown) => opts.log(`Update: ${m}`),

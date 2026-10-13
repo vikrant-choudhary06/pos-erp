@@ -6,7 +6,7 @@ import type { Store } from './store';
 // Online, the hub is a plain reverse proxy to the cloud. Three things make
 // that work for tablets on the shop's LAN:
 //  - Origin/Host are rewritten, so the cloud's CSRF check sees itself.
-//  - Cookies lose Secure/Domain, so they stick on http://192.168.x.x:7400.
+//  - Cookies are host-only and Secure over TLS. Plain HTTP is loopback-only.
 //  - The till cookie (pos_device) stays with the hub and is added to every
 //    request, so every tablet bills as this counter.
 
@@ -60,7 +60,10 @@ export function forward(
       }
       answered = true;
       const type = String(reply.headers['content-type'] ?? '');
-      res.writeHead(status, responseHeaders(reply, store, cloud));
+      res.writeHead(
+        status,
+        responseHeaders(reply, store, cloud, 'encrypted' in req.socket && !!req.socket.encrypted),
+      );
 
       if (!options.buffer) {
         reply.pipe(res);
@@ -82,10 +85,10 @@ export function forward(
   });
 }
 
-function responseHeaders(reply: IncomingMessage, store: Store, cloud: Cloud) {
+function responseHeaders(reply: IncomingMessage, store: Store, cloud: Cloud, secure: boolean) {
   const headers: OutgoingHttpHeaders = { ...reply.headers };
   for (const h of HOP) delete headers[h];
-  // plain http on the LAN, HSTS would only confuse the browser
+  // The cloud's HSTS policy must not affect other services on the counter host.
   delete headers['strict-transport-security'];
 
   if (typeof headers.location === 'string' && headers.location.startsWith(cloud.origin)) {
@@ -100,7 +103,8 @@ function responseHeaders(reply: IncomingMessage, store: Store, cloud: Cloud) {
       keepDeviceCookie(store, line, pair);
       continue;
     }
-    cookies.push(line.replace(/;\s*secure/gi, '').replace(/;\s*domain=[^;]*/gi, ''));
+    const cookie = line.replace(/;\s*secure/gi, '').replace(/;\s*domain=[^;]*/gi, '');
+    cookies.push(cookie + (secure ? '; Secure' : ''));
   }
   headers['set-cookie'] = cookies;
   return headers;

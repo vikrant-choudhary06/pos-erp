@@ -1,6 +1,7 @@
 import type { BusinessType, FoodType, OutletSettings } from '@pos/shared';
 
 export type Me = {
+  offlineExpiresAt: string;
   user: {
     id: string;
     name: string;

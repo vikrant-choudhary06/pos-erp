@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, isOffline } from '@/lib/api';
 import type { Order, PosItem, PosMenu, Shift } from '@/lib/pos-types';
 import { useSession } from '@/lib/session';
-import { cachedApi } from '@/offline/cache';
+import { cachedApi, authorizeOfflineOutlet } from '@/offline/cache';
 import { db } from '@/offline/db';
 import { isLocalMode } from '@/offline/state';
 
@@ -28,12 +28,14 @@ export function useActiveOrders() {
   return useQuery({
     queryKey: ['orders-active', outletId],
     queryFn: async () => {
-      const local = () =>
-        db()
+      const local = async () => {
+        await authorizeOfflineOutlet(outletId);
+        return db()
           .orders.where('outletId')
           .equals(outletId)
           .filter((o) => ACTIVE.includes(o.status))
           .sortBy('openedAt');
+      };
       if (isLocalMode()) return local();
 
       try {
@@ -61,7 +63,10 @@ export function useOrder(id: string | null) {
     queryFn: async () => {
       if (isLocalMode()) {
         const local = await db().orders.get(id!);
-        if (local) return local;
+        if (local) {
+          await authorizeOfflineOutlet(local.outletId);
+          return local;
+        }
       }
       try {
         const order = await api<Order>(`/orders/${id}`);
@@ -69,7 +74,10 @@ export function useOrder(id: string | null) {
         return order;
       } catch (err) {
         const local = isOffline(err) ? await db().orders.get(id!) : undefined;
-        if (local) return local;
+        if (local) {
+          await authorizeOfflineOutlet(local.outletId);
+          return local;
+        }
         throw err;
       }
     },

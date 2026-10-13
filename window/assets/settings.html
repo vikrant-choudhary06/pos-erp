@@ -8,39 +8,155 @@
     />
     <title>Rizzoto settings</title>
     <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; padding: 24px; font: 14px/1.45 system-ui, sans-serif; color: #1b1b19; background: #fff; }
-      h1 { font-size: 17px; margin: 0 0 4px; }
-      h2 { font-size: 13px; margin: 24px 0 8px; color: #6b6b66; font-weight: 500; }
-      p { margin: 0; color: #6b6b66; }
-      label { display: block; margin-top: 12px; font-weight: 500; }
-      input[type='text'], input[type='number'], select {
-        width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
-        border: 1px solid #dcdcd8; border-radius: 8px; background: #fff; color: inherit;
+      * {
+        box-sizing: border-box;
       }
-      input:focus, select:focus { outline: 2px solid #1b1b19; outline-offset: -1px; }
-      .check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
-      .row { display: flex; gap: 8px; align-items: end; }
-      .row > :first-child { flex: 1; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        color: #1b1b19;
+        background: #fff;
+      }
+      h1 {
+        font-size: 17px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 13px;
+        margin: 24px 0 8px;
+        color: #6b6b66;
+        font-weight: 500;
+      }
+      p {
+        margin: 0;
+        color: #6b6b66;
+      }
+      label {
+        display: block;
+        margin-top: 12px;
+        font-weight: 500;
+      }
+      input[type='text'],
+      input[type='number'],
+      select {
+        width: 100%;
+        margin-top: 4px;
+        padding: 8px 10px;
+        font: inherit;
+        border: 1px solid #dcdcd8;
+        border-radius: 8px;
+        background: #fff;
+        color: inherit;
+      }
+      input:focus,
+      select:focus {
+        outline: 2px solid #1b1b19;
+        outline-offset: -1px;
+      }
+      .check {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-weight: 400;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: end;
+      }
+      .row > :first-child {
+        flex: 1;
+      }
       button {
-        font: inherit; padding: 8px 14px; border-radius: 8px; cursor: pointer;
-        border: 1px solid #dcdcd8; background: #fff; color: inherit;
+        font: inherit;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid #dcdcd8;
+        background: #fff;
+        color: inherit;
       }
-      button.primary { background: #1b1b19; border-color: #1b1b19; color: #fff; }
-      button:disabled { opacity: 0.5; cursor: default; }
-      .status { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #ececea; border-radius: 10px; margin-top: 16px; }
-      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #b5b5b0; }
-      .dot.online { background: #2f9e44; }
-      .dot.offline { background: #d9480f; }
-      .dot.syncing { background: #e8a33d; }
-      code { font: 13px ui-monospace, Consolas, monospace; user-select: all; }
-      ul { list-style: none; padding: 0; margin: 0; }
-      li { padding: 8px 0; border-bottom: 1px solid #f0f0ee; display: flex; justify-content: space-between; gap: 8px; }
-      li small { color: #b42318; display: block; }
-      .error { color: #b42318; margin-top: 12px; min-height: 20px; }
-      footer { display: flex; justify-content: end; gap: 8px; margin-top: 20px; }
-      .update { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-      [hidden] { display: none !important; }
+      button.primary {
+        background: #1b1b19;
+        border-color: #1b1b19;
+        color: #fff;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid #ececea;
+        border-radius: 10px;
+        margin-top: 16px;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        background: #b5b5b0;
+      }
+      .dot.online {
+        background: #2f9e44;
+      }
+      .dot.offline {
+        background: #d9480f;
+      }
+      .dot.syncing {
+        background: #e8a33d;
+      }
+      code {
+        font:
+          13px ui-monospace,
+          Consolas,
+          monospace;
+        user-select: all;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      li {
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0ee;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      li small {
+        color: #b42318;
+        display: block;
+      }
+      .error {
+        color: #b42318;
+        margin-top: 12px;
+        min-height: 20px;
+      }
+      footer {
+        display: flex;
+        justify-content: end;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      .update {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      [hidden] {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
@@ -59,6 +175,12 @@
       </label>
 
       <h2>Tablets in the shop</h2>
+      <p>
+        Tablet access requires an HTTPS certificate trusted by the counter and tablets, covering
+        localhost and the counter's LAN address. Without it, only this PC can connect.
+      </p>
+      <label>HTTPS certificate file (PEM)<input type="text" name="tlsCertPath" /></label>
+      <label>HTTPS private key file (PEM)<input type="text" name="tlsKeyPath" /></label>
       <p>Open this address on each tablet or phone on the same Wi-Fi:</p>
       <p id="addresses"><code>Starts after you save</code></p>
       <label>
@@ -76,7 +198,9 @@
         <button type="button" data-test="kot">Test</button>
       </div>
 
-      <label class="check"><input type="checkbox" name="startWithWindows" /> Start with Windows</label>
+      <label class="check"
+        ><input type="checkbox" name="startWithWindows" /> Start with Windows</label
+      >
 
       <h2>Updates</h2>
       <div class="update">

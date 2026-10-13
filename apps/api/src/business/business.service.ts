@@ -49,8 +49,8 @@ export class BusinessService {
     });
   }
 
-  async updateOutlet(tenantId: string, id: string, { settings, ...data }: UpdateOutletDto) {
-    const outlet = await this.findOutlet(tenantId, id);
+  async updateOutlet(user: AuthUser, id: string, { settings, ...data }: UpdateOutletDto) {
+    const outlet = await this.outletFor(user, id);
     return this.prisma.outlet.update({
       where: { id },
       data: {

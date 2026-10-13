@@ -23,6 +23,7 @@ import { requirePermission } from '../common/permissions';
 import { EventsService } from '../events/events.service';
 import { StockService } from '../inventory/stock.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PmsAccessService } from '../pms/pms-access.service';
 import {
   AddItemsDto,
   BillDto,
@@ -62,6 +63,7 @@ export class OrdersService {
     private events: EventsService,
     private audit: AuditService,
     private stock: StockService,
+    private hotels: PmsAccessService,
   ) {}
 
   // ---- reading -------------------------------------------------------------
@@ -468,10 +470,75 @@ export class OrdersService {
     return this.get(user, id);
   }
 
+  async chargeRoom(user: AuthUser, id: string, reservationId: string) {
+    const reservation = await this.prisma.hotelReservation.findFirst({
+      where: { id: reservationId, property: { tenantId: user.tenantId } },
+      include: { property: true },
+    });
+    if (!reservation) throw new NotFoundException('Guest stay not found');
+    await this.hotels.property(user, reservation.propertyId);
+    const initial = await this.prisma.order.findFirst({ where: { id, tenantId: user.tenantId } });
+    if (
+      !initial ||
+      !canAccessOutlet(user, initial.outletId) ||
+      initial.outletId !== reservation.property.outletId
+    )
+      throw new NotFoundException('The order and guest stay must belong to this hotel outlet');
+    if (initial.status === 'OPEN') await this.bill(user, id);
+    await this.prisma.$transaction(async (tx) => {
+      const property = await this.hotels.lock(user, reservation.propertyId, tx);
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
+      const order = await tx.order.findFirst({ where: { id, tenantId: user.tenantId } });
+      const stay = await this.hotels.reservation(user, property.id, reservationId, tx);
+      if (!order || order.outletId !== property.outletId)
+        throw new NotFoundException('Order not found');
+      const known = await tx.hotelFolioEntry.findUnique({ where: { orderId: id } });
+      if (known) {
+        if (known.reservationId !== reservationId)
+          throw new ConflictException('This bill is already charged to another guest');
+        return;
+      }
+      if (stay.status !== 'CHECKED_IN' || !stay.allowRoomCharges)
+        throw new BadRequestException('This guest is not checked in or room charging is disabled');
+      if (order.status !== 'BILLED' || Number(order.paidTotal) !== 0)
+        throw new BadRequestException('Only an unpaid printed bill can be charged to a room');
+      if (!(await tx.invoice.findFirst({ where: { orderId: id, status: 'ISSUED' } })))
+        throw new BadRequestException('The restaurant invoice is missing');
+      await tx.hotelFolioEntry.create({
+        data: {
+          reservationId,
+          kind: 'RESTAURANT',
+          description: `Restaurant bill ${order.orderNo}`,
+          amount: order.grandTotal,
+          taxAmount: order.taxTotal,
+          businessDate: property.businessDate,
+          sourceKey: `order:${id}`,
+          orderId: id,
+          createdById: user.userId,
+        },
+      });
+      await tx.order.update({ where: { id }, data: { status: 'CHARGED', closedAt: new Date() } });
+      await this.closeOut(tx, user, order);
+      await this.audit.log(
+        user,
+        {
+          action: 'hotel.restaurant.charge',
+          entityType: 'Order',
+          entityId: id,
+          outletId: property.outletId,
+          after: { reservationId, amount: order.grandTotal },
+        },
+        tx,
+      );
+    });
+    this.notify(initial.outletId, id, Boolean(initial.tableId));
+    return this.get(user, id);
+  }
+
   // ---- billing ---------------------------------------------------------------
 
   async bill(user: AuthUser, id: string, offline: BillDto = {}) {
-    const order = await this.loadActive(user, id);
+    let order = await this.loadActive(user, id);
     if (order.status === 'BILLED') return this.get(user, id);
 
     const outlet = await this.business.findOutlet(user.tenantId, order.outletId);
@@ -481,6 +548,9 @@ export class OrdersService {
     if (!activeItems) throw new BadRequestException('Add items before printing the bill');
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
+      order = await this.loadActive(user, id, tx);
+      if (order.status === 'BILLED') return;
       // anything still in the cart goes to the kitchen with the bill
       await this.createKots(tx, order, user.userId);
 
@@ -547,13 +617,16 @@ export class OrdersService {
 
   /** Cancel the printed bill so items can be changed. The invoice is kept as cancelled. */
   async reopen(user: AuthUser, id: string, reason: string) {
-    const order = await this.loadActive(user, id);
+    let order = await this.loadActive(user, id);
     if (order.status !== 'BILLED') throw new BadRequestException('This order has no printed bill');
 
-    const paid = await this.prisma.payment.count({ where: { orderId: id, status: 'SUCCESS' } });
-    if (paid) throw new BadRequestException('Payment has been taken. Void the order instead.');
-
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
+      order = await this.loadActive(user, id, tx);
+      if (order.status !== 'BILLED')
+        throw new BadRequestException('This order has no printed bill');
+      const paid = await tx.payment.count({ where: { orderId: id, status: 'SUCCESS' } });
+      if (paid) throw new BadRequestException('Payment has been taken. Void the order instead.');
       const invoices = await tx.invoice.findMany({ where: { orderId: id, status: 'ISSUED' } });
       await tx.invoice.updateMany({
         where: { orderId: id, status: 'ISSUED' },
@@ -587,53 +660,81 @@ export class OrdersService {
   }
 
   async pay(user: AuthUser, id: string, dto: PayDto) {
-    let order = await this.loadActive(user, id);
+    const order = await this.prisma.order.findFirst({ where: { id, tenantId: user.tenantId } });
+    if (!order || !canAccessOutlet(user, order.outletId))
+      throw new NotFoundException('Order not found');
     if (order.status === 'OPEN') {
-      await this.bill(user, id);
-      order = await this.loadActive(user, id);
+      try {
+        await this.bill(user, id);
+      } catch (error) {
+        // Another till may have finished billing and paying while we waited.
+        // The locked payment check below still rejects any new payment on it.
+        const current = await this.prisma.order.findUnique({ where: { id } });
+        if (!(error instanceof BadRequestException) || current?.status !== 'PAID') throw error;
+      }
     }
 
-    const shift = await this.prisma.shift.findFirst({
-      where: { outletId: order.outletId, status: 'OPEN' },
-    });
-    if (!shift) throw new BadRequestException('Open a cash shift before taking payments');
+    const paymentIds = dto.payments.flatMap((p) => (p.id ? [p.id] : []));
+    if (new Set(paymentIds).size !== paymentIds.length)
+      throw new BadRequestException('Each payment needs a different ID');
 
-    const known = await this.prisma.payment.findMany({
-      where: { id: { in: dto.payments.map((p) => p.id).filter(Boolean) as string[] } },
-      select: { id: true },
-    });
-    const payments = dto.payments.filter((p) => !p.id || !known.some((k) => k.id === p.id));
-    if (dto.payments.length && !payments.length)
-      return { order: await this.get(user, id), change: 0 };
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Read the balance only after earlier payments on this order have committed.
+      await tx.$queryRaw`
+        SELECT id FROM "Order" WHERE id = ${id}::uuid AND "tenantId" = ${user.tenantId}::uuid FOR UPDATE
+      `;
+      const order = await tx.order.findFirst({ where: { id, tenantId: user.tenantId } });
+      if (!order || !canAccessOutlet(user, order.outletId))
+        throw new NotFoundException('Order not found');
 
-    if (payments.some((p) => p.method === 'CREDIT') && !order.customerId) {
-      throw new BadRequestException('Add the customer’s phone number to put this on credit');
-    }
+      const known = await tx.payment.findMany({
+        where: { id: { in: paymentIds } },
+        select: { id: true, orderId: true, status: true },
+      });
+      if (known.some((p) => p.orderId !== id || p.status !== 'SUCCESS'))
+        throw new BadRequestException('This payment ID has already been used');
+      const payments = dto.payments.filter((p) => !p.id || !known.some((k) => k.id === p.id));
+      if (dto.payments.length && !payments.length)
+        return { change: 0, settled: false, outletId: order.outletId, tableId: order.tableId };
 
-    // all maths in paise
-    const due = toPaise(order.grandTotal.toString()) - toPaise(order.paidTotal.toString());
-    const nonCash = payments.filter((p) => p.method !== 'CASH');
-    const cash = payments.filter((p) => p.method === 'CASH');
-    const nonCashTotal = nonCash.reduce((sum, p) => sum + toPaise(p.amount), 0);
-    const cashGiven = cash.reduce((sum, p) => sum + toPaise(p.amount), 0);
+      if (order.status !== 'BILLED')
+        throw new BadRequestException(
+          order.status === 'PAID'
+            ? 'This order is already paid'
+            : 'Print the bill before taking payment',
+        );
+      const shift = await tx.shift.findFirst({
+        where: { outletId: order.outletId, status: 'OPEN' },
+      });
+      if (!shift) throw new BadRequestException('Open a cash shift before taking payments');
 
-    if (nonCashTotal > due) throw new BadRequestException('That is more than the amount due');
-    const cashApplied = Math.min(cashGiven, due - nonCashTotal);
-    const change = cashGiven - cashApplied;
+      if (payments.some((p) => p.method === 'CREDIT') && !order.customerId) {
+        throw new BadRequestException('Add the customer’s phone number to put this on credit');
+      }
 
-    const toSave = [
-      ...nonCash.map((p) => ({ ...p, paise: toPaise(p.amount) })),
-      ...(cashApplied > 0 ? [{ ...cash[0], amount: cashApplied / 100, paise: cashApplied }] : []),
-    ];
-    const paidNow = toSave.reduce((sum, p) => sum + p.paise, 0);
-    if (!paidNow && due > 0) throw new BadRequestException('Add a payment');
-    const settled = paidNow >= due;
-    const paidAt = clientTime(dto.paidAt);
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { orderId: id, status: 'ISSUED' },
-    });
+      // all maths in paise
+      const due = toPaise(order.grandTotal.toString()) - toPaise(order.paidTotal.toString());
+      const nonCash = payments.filter((p) => p.method !== 'CASH');
+      const cash = payments.filter((p) => p.method === 'CASH');
+      const nonCashTotal = nonCash.reduce((sum, p) => sum + toPaise(p.amount), 0);
+      const cashGiven = cash.reduce((sum, p) => sum + toPaise(p.amount), 0);
 
-    await this.prisma.$transaction(async (tx) => {
+      if (nonCashTotal > due) throw new BadRequestException('That is more than the amount due');
+      const cashApplied = Math.min(cashGiven, due - nonCashTotal);
+      const change = cashGiven - cashApplied;
+
+      const toSave = [
+        ...nonCash.map((p) => ({ ...p, paise: toPaise(p.amount) })),
+        ...(cashApplied > 0 ? [{ ...cash[0], amount: cashApplied / 100, paise: cashApplied }] : []),
+      ];
+      const paidNow = toSave.reduce((sum, p) => sum + p.paise, 0);
+      if (!paidNow && due > 0) throw new BadRequestException('Add a payment');
+      const settled = paidNow >= due;
+      const paidAt = clientTime(dto.paidAt);
+      const invoice = await tx.invoice.findFirst({
+        where: { orderId: id, status: 'ISSUED' },
+      });
+
       for (const [i, p] of toSave.entries()) {
         await tx.payment.create({
           data: {
@@ -668,14 +769,15 @@ export class OrdersService {
       });
 
       if (settled) await this.closeOut(tx, user, order);
+      return { change: change / 100, settled, outletId: order.outletId, tableId: order.tableId };
     });
 
-    this.notify(order.outletId, id, settled && Boolean(order.tableId));
-    return { order: await this.get(user, id), change: change / 100 };
+    this.notify(result.outletId, id, result.settled && Boolean(result.tableId));
+    return { order: await this.get(user, id), change: result.change };
   }
 
   async void(user: AuthUser, id: string, reason: string) {
-    const order = await this.prisma.order.findFirst({
+    let order = await this.prisma.order.findFirst({
       where: { id, tenantId: user.tenantId },
       include: { items: { where: { status: { not: 'CANCELLED' } } } },
     });
@@ -688,6 +790,20 @@ export class OrdersService {
     if (!untouched) requirePermission(user, 'bill.void', 'Ask a manager to void this order');
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
+      order = await tx.order.findFirst({
+        where: { id, tenantId: user.tenantId },
+        include: { items: { where: { status: { not: 'CANCELLED' } } } },
+      });
+      if (!order || !canAccessOutlet(user, order.outletId))
+        throw new NotFoundException('Order not found');
+      if (order.status === 'VOID') throw new BadRequestException('Already voided');
+      if (order.status === 'CHARGED')
+        throw new BadRequestException(
+          'This bill is transferred to a hotel guest account. Resolve corrections in the hotel account.',
+        );
+      const untouched = order.status === 'OPEN' && order.items.every((i) => i.status === 'PENDING');
+      if (!untouched) requirePermission(user, 'bill.void', 'Ask a manager to void this order');
       await tx.invoice.updateMany({
         where: { orderId: id, status: 'ISSUED' },
         data: {
@@ -979,8 +1095,8 @@ export class OrdersService {
     return tx.diningTable.update({ where: { id: tableId }, data: { status: 'AVAILABLE' } });
   }
 
-  private async loadActive(user: AuthUser, id: string) {
-    const order = await this.prisma.order.findFirst({ where: { id, tenantId: user.tenantId } });
+  private async loadActive(user: AuthUser, id: string, db: Tx = this.prisma) {
+    const order = await db.order.findFirst({ where: { id, tenantId: user.tenantId } });
     if (!order || !canAccessOutlet(user, order.outletId))
       throw new NotFoundException('Order not found');
     if (!ACTIVE.includes(order.status)) {

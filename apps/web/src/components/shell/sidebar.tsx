@@ -1,7 +1,7 @@
 'use client';
 
 import type { Permission } from '@pos/shared';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import {
@@ -11,6 +11,7 @@ import {
   ContactRound,
   History,
   House,
+  Hotel,
   LogOut,
   Menu,
   MonitorSmartphone,
@@ -136,10 +137,18 @@ function SidebarContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { me, can } = useSession();
+  const hotels = useQuery({
+    queryKey: ['hotel-properties', me.business.id],
+    queryFn: () => api<{ id: string }[]>('/pms/properties'),
+    enabled: can('hotel.view') || can('hotel.housekeeping') || can('hotel.manage'),
+  });
 
-  const groups = NAV.map((group) =>
-    group.filter((item) => !item.permission || can(item.permission)),
-  ).filter((group) => group.length);
+  const hotelNav: NavItem[] = hotels.data?.length
+    ? [{ href: '/dashboard/hotel', label: 'Hotel', icon: Hotel }]
+    : [];
+  const groups = [...NAV, hotelNav]
+    .map((group) => group.filter((item) => !item.permission || can(item.permission)))
+    .filter((group) => group.length);
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href);
 

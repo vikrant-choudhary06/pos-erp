@@ -43,6 +43,7 @@ const STATUS_LABEL: Record<Order['status'], string> = {
   OPEN: 'Open',
   BILLED: 'Billed',
   PAID: 'Paid',
+  CHARGED: 'Charged to room',
   VOID: 'Void',
 };
 

@@ -60,17 +60,30 @@ export class OtpService {
     }
 
     if (!safeEqual(this.hash(email, code), otp.codeHash)) {
-      await this.prisma.otpCode.update({
-        where: { id: otp.id },
+      await this.prisma.otpCode.updateMany({
+        where: {
+          id: otp.id,
+          verifiedAt: null,
+          expiresAt: { gt: new Date() },
+          attempts: { lt: MAX_ATTEMPTS },
+        },
         data: { attempts: { increment: 1 } },
       });
       throw new BadRequestException('That code is not correct');
     }
 
-    await this.prisma.otpCode.update({
-      where: { id: otp.id },
+    const consumed = await this.prisma.otpCode.updateMany({
+      where: {
+        id: otp.id,
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+        attempts: { lt: MAX_ATTEMPTS },
+      },
       data: { verifiedAt: new Date() },
     });
+    if (!consumed.count) {
+      throw new BadRequestException('This code is no longer valid. Request a new one.');
+    }
 
     return otp.id;
   }

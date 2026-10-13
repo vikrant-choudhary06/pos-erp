@@ -139,6 +139,7 @@ export function billHtml(order: Order, header: BillHeader) {
     ${Number(order.roundOff) ? `<div class="row"><span>Round off</span><span>${amount(order.roundOff)}</span></div>` : ''}
     <hr>
     <div class="row big"><span>TOTAL</span><span>₹${amount(order.grandTotal)}</span></div>
+    ${order.status === 'CHARGED' ? '<hr><div class="c">Charged to hotel guest account — no payment collected here</div>' : ''}
     ${payments ? `<hr>${payments}` : ''}
     <hr>
     <div class="c muted">${esc(header.footer ?? '')}</div>

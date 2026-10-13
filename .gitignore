@@ -9,6 +9,7 @@ coverage
 .env.production
 test-results
 playwright-report
+window/release/
 .claude/
 .open-next
 .wrangler

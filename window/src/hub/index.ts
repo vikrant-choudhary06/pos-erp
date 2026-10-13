@@ -1,5 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import os from 'node:os';
+import https from 'node:https';
+import type { Protection } from './protection';
 import { businessDate, financialYear, type Kot, type Order } from '@pos/shared';
 import { Cloud } from './cloud';
 import { LocalEvents } from './events';
@@ -9,6 +11,7 @@ import {
   parseCookies,
   parseJson,
   readBody,
+  requestJson,
   sendError,
   sendJson,
   SESSION_COOKIE,
@@ -25,6 +28,8 @@ export type HubOptions = {
   port?: number;
   host?: string;
   log?: (message: string) => void;
+  protection: Protection;
+  tls?: { cert: Buffer; key: Buffer };
 };
 
 export type HubStatus = {
@@ -32,6 +37,7 @@ export type HubStatus = {
   cloudUrl: string;
   port: number;
   addresses: string[];
+  localOrigin: string;
   till: { code: string; outletCode: string } | null;
   pending: number;
   failed: { seq: number; label: string; error?: string; at: string }[];
@@ -51,7 +57,10 @@ const POLL = 5000;
 
 export async function startHub(options: HubOptions) {
   const log = options.log ?? (() => {});
-  const store = new Store(options.dataDir);
+  const host = options.host ?? (options.tls ? '0.0.0.0' : '127.0.0.1');
+  if (!options.tls && !['127.0.0.1', '::1'].includes(host))
+    throw new Error('LAN access requires a TLS certificate and key');
+  const store = new Store(options.dataDir, options.protection);
   const cloud = new Cloud(options.cloudUrl, store);
   const pages = new Pages(options.dataDir);
   const events = new LocalEvents();
@@ -91,10 +100,57 @@ export async function startHub(options: HubOptions) {
   // --- requests ---
 
   async function handle(req: IncomingMessage, res: ServerResponse) {
-    const url = new URL(req.url ?? '/', 'http://hub');
+    const url = cloud.resolveTarget(req.url ?? '/');
     const isApi = url.pathname.startsWith('/api/');
     const session = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    const origin = req.headers.origin;
+    const expectedOrigin = `${options.tls ? 'https' : 'http'}://${req.headers.host}`;
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method!) && origin && origin !== expectedOrigin) {
+      throw new HttpError(403, 'Cross-site request blocked');
+    }
     const raw = await readBody(req);
+
+    if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
+      if (session) {
+        const fingerprint = hash(session);
+        const known =
+          store.data.cache[`me:${fingerprint}`] !== undefined ||
+          store.data.revokedSessions[fingerprint] ||
+          store.data.lastSession === session ||
+          store.data.outbox.some((entry) => entry.session === session) ||
+          store.data.revocations.includes(session);
+        // Arbitrary cookies must not create persistent state or a revocation queue.
+        // An uncached session can be signed out by the cloud once it is reachable.
+        if (!known) {
+          if (!isLocal()) {
+            const reply = await forward(cloud, store, req, res, { raw, buffer: true });
+            if (reply) return;
+            cloudDown();
+          }
+          throw new HttpError(503, 'Server sign-out is pending until the connection returns');
+        }
+      }
+      if (session) {
+        store.data.revokedSessions[hash(session)] = true;
+        delete store.data.cache[`me:${hash(session)}`];
+        for (const key of Object.keys(store.data.cache))
+          if (key.startsWith(`session:${hash(session)}:`)) delete store.data.cache[key];
+        if (store.data.lastSession === session) store.data.lastSession = null;
+        if (!store.data.revocations.includes(session)) store.data.revocations.push(session);
+        store.flush();
+        events.closeAll();
+        for (const stream of streams) stream.destroy();
+      }
+      res.setHeader(
+        'set-cookie',
+        `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${options.tls ? '; Secure' : ''}`,
+      );
+      sendJson(res, 200, { ok: true });
+      void tick();
+      return;
+    }
+    if (session && store.data.revokedSessions[hash(session)])
+      throw new HttpError(401, 'Please sign in again');
 
     // the hub numbers offline orders itself, browsers behind it never should
     if (url.pathname === '/api/devices/me') return sendJson(res, 200, null);
@@ -117,6 +173,12 @@ export async function startHub(options: HubOptions) {
       });
 
       if (reply) {
+        if (session && (reply.status === 401 || reply.status === 403)) {
+          delete store.data.cache[`me:${hash(session)}`];
+          if (store.data.lastSession === session) store.data.lastSession = null;
+          store.flush();
+          events.closeAll();
+        }
         if (reply.body && keep && reply.status === 200) {
           pages.put(url.pathname, reply.type, reply.body);
         }
@@ -140,12 +202,14 @@ export async function startHub(options: HubOptions) {
     session: string | undefined,
     raw: Buffer,
   ) {
-    if (url.pathname === '/api/events') {
-      if (!local.meFor(session)) return sendError(res, 401, 'Please sign in again');
-      return events.attach(res, url.searchParams.get('outletId') ?? '');
-    }
     try {
-      const reply = await local.handle(req.method!, url, session, parseJson(raw));
+      if (url.pathname === '/api/events') {
+        const outletId = url.searchParams.get('outletId') ?? '';
+        return events.attach(res, outletId, () => {
+          local.authorizeOutlet(session, outletId);
+        });
+      }
+      const reply = await local.handle(req.method!, url, session, requestJson(raw));
       sendJson(res, reply.status, reply.body);
       if (req.method !== 'GET') changed();
     } catch (err) {
@@ -174,13 +238,23 @@ export async function startHub(options: HubOptions) {
     const { data } = store;
 
     if (method === 'GET' && path === '/api/auth/me' && session) {
-      data.cache[`me:${hash(session)}`] = body;
-      data.lastSession = session;
+      if (Date.parse(body?.offlineExpiresAt) > Date.now() && !data.revokedSessions[hash(session)]) {
+        data.cache[`me:${hash(session)}`] = {
+          ...body,
+          offlineExpiresAt: new Date(
+            Math.min(Date.parse(body.offlineExpiresAt), Date.now() + 12 * 60 * 60 * 1000),
+          ).toISOString(),
+        };
+        data.lastSession = session;
+      }
     } else if (method === 'POST' && path === '/api/auth/logout' && session) {
       delete data.cache[`me:${hash(session)}`];
       if (data.lastSession === session) data.lastSession = null;
     } else if (method === 'GET' && CACHED.some((re) => re.test(path))) {
-      data.cache[path.slice(4) + url.search] = body;
+      if (session) data.cache[`session:${hash(session)}:${path.slice(4)}${url.search}`] = body;
+      // Canonical per-outlet copies are only consumed after explicit outlet checks.
+      if (path === '/api/pos/menu' || path === '/api/shifts/current')
+        data.cache[path.slice(4) + url.search] = body;
     } else if (method === 'GET' && path === '/api/orders/active') {
       const outletId = url.searchParams.get('outletId');
       for (const o of Object.values(data.orders))
@@ -293,6 +367,19 @@ export async function startHub(options: HubOptions) {
         if (!done) cloudUp = false;
         else await refreshOrders().catch(() => {});
       }
+      if (!forced && cloudUp && !store.data.outbox.length) {
+        for (const token of [...store.data.revocations]) {
+          try {
+            const reply = await cloud.request('POST', '/api/auth/logout', { session: token });
+            if (reply.status < 300 || reply.status === 401) {
+              store.data.revocations = store.data.revocations.filter((s) => s !== token);
+              store.flush();
+            }
+          } catch {
+            break;
+          }
+        }
+      }
       // check often until this counter is a till, then every few minutes
       const every = store.data.till ? 5 * 60_000 : 30_000;
       if (!isLocal() && store.data.deviceCookie && Date.now() - lastTill > every) {
@@ -314,7 +401,11 @@ export async function startHub(options: HubOptions) {
       mode: isLocal() ? (cloudUp && !forced ? 'syncing' : 'offline') : 'online',
       cloudUrl: cloud.origin,
       port,
-      addresses: lanAddresses().map((a) => `http://${a}:${port}`),
+      addresses:
+        options.tls && !['127.0.0.1', '::1'].includes(host)
+          ? lanAddresses().map((a) => `https://${a}:${port}`)
+          : [],
+      localOrigin: `${options.tls ? 'https' : 'http'}://localhost:${port}`,
       till: store.data.till && {
         code: store.data.till.code,
         outletCode: store.data.till.outletCode,
@@ -326,18 +417,44 @@ export async function startHub(options: HubOptions) {
 
   // --- server ---
 
-  const server = http.createServer((req, res) => {
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
     handle(req, res).catch((err) => {
+      if (err instanceof HttpError && !res.headersSent) {
+        if (err.status === 413 || err.status === 408) {
+          res.setHeader('connection', 'close');
+          res.once('finish', () => req.destroy());
+        }
+        return sendError(res, err.status, err.message);
+      }
       log(`Hub error: ${(err as Error).stack}`);
       if (!res.headersSent) sendError(res, 500, 'Something went wrong on the counter');
       else res.destroy();
     });
-  });
-  server.keepAliveTimeout = 65_000;
+  };
+  let server: http.Server | https.Server;
+  try {
+    server = options.tls
+      ? https.createServer({ ...options.tls, minVersion: 'TLSv1.2' }, handler)
+      : http.createServer(handler);
+  } catch (err) {
+    events.stop();
+    throw err;
+  }
+  server.keepAliveTimeout = 5000;
+  server.requestTimeout = 15_000;
+  server.headersTimeout = 10_000;
+  server.maxConnections = 128;
+  server.maxRequestsPerSocket = 1000;
   // websockets (Next's dev reload) pass straight through while online
   server.on('upgrade', (req, socket, head) => {
     if (isLocal()) return socket.destroy();
-    const upstream = cloud.open('GET', req.url!, { ...req.headers, host: cloud.base.host }, 0);
+    let upstream: http.ClientRequest;
+    try {
+      upstream = cloud.open('GET', req.url!, { ...req.headers, host: cloud.base.host }, 0);
+    } catch {
+      socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+      return;
+    }
     upstream.on('upgrade', (reply, cloudSocket, cloudHead) => {
       const lines = Object.entries(reply.headers).map(([k, v]) => `${k}: ${v}`);
       socket.write(['HTTP/1.1 101 Switching Protocols', ...lines, '', ''].join('\r\n'));
@@ -352,10 +469,15 @@ export async function startHub(options: HubOptions) {
     upstream.end();
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(options.port ?? 7400, options.host ?? '0.0.0.0', resolve);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(options.port ?? 7400, host, resolve);
+    });
+  } catch (err) {
+    events.stop();
+    throw err;
+  }
   const port = (server.address() as { port: number }).port;
   const timer = setInterval(() => void tick(), POLL);
   void tick();

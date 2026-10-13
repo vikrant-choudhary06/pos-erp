@@ -13,13 +13,53 @@ export class HttpError extends Error {
   }
 }
 
+export const MAX_BODY_BYTES = 200 * 1024;
+
 export function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    if (Number(req.headers['content-length']) > MAX_BODY_BYTES) {
+      req.pause();
+      return reject(new HttpError(413, 'Request body is too large'));
+    }
     const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => chunks.push(c));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    let size = 0;
+    const cleanup = () => {
+      clearTimeout(timer);
+      req.off('data', onData);
+      req.off('end', onEnd);
+      req.off('aborted', onAbort);
+      req.off('error', fail);
+    };
+    const fail = (err: Error) => {
+      cleanup();
+      req.pause();
+      reject(err);
+    };
+    const onAbort = () => fail(new HttpError(400, 'Request aborted'));
+    const onData = (c: Buffer) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES) return fail(new HttpError(413, 'Request body is too large'));
+      chunks.push(c);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(Buffer.concat(chunks));
+    };
+    const timer = setTimeout(() => fail(new HttpError(408, 'Request body timed out')), 10_000);
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('aborted', onAbort);
+    req.on('error', fail);
   });
+}
+
+export function requestJson(raw: Buffer): unknown {
+  if (!raw.length) return undefined;
+  try {
+    return JSON.parse(raw.toString('utf8'));
+  } catch {
+    throw new HttpError(400, 'Invalid JSON');
+  }
 }
 
 export function parseJson(raw: Buffer): any {

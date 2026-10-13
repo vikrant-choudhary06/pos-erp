@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { retryLogout } from '@/offline/logout';
 
 // no point retrying when offline (the till falls back to its own data) or
 // when the server said no
@@ -25,6 +26,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   const { theme } = useTheme();
+
+  useEffect(() => {
+    const retry = () => {
+      void retryLogout();
+    };
+    retry();
+    const timer = setInterval(retry, 5000);
+    window.addEventListener('online', retry);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', retry);
+    };
+  }, []);
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {

@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { SessionsService } from '../auth/sessions.service';
+import type { AuthUser } from '../auth/decorators';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStaffDto, RoleDto, UpdateStaffDto } from './dto';
 
@@ -40,8 +46,10 @@ export class StaffService {
     return rows.map(present);
   }
 
-  async create(tenantId: string, input: CreateStaffDto) {
-    await this.checkRole(tenantId, input.roleId);
+  async create(actor: AuthUser, input: CreateStaffDto) {
+    const { tenantId } = actor;
+    await this.checkRole(actor, input.roleId);
+    this.checkScope(actor, input.allOutlets ?? false, input.outletIds ?? []);
     await this.checkOutlets(tenantId, input.outletIds);
 
     const data = {
@@ -79,13 +87,23 @@ export class StaffService {
     throw new BadRequestException('Could not create staff, please try again');
   }
 
-  async update(tenantId: string, id: string, input: UpdateStaffDto) {
+  async update(actor: AuthUser, id: string, input: UpdateStaffDto) {
+    const { tenantId } = actor;
     const user = await this.find(tenantId, id);
+    this.checkTarget(actor, user);
 
     if (user.isOwner && (input.roleId || input.status === 'INACTIVE')) {
       throw new BadRequestException("The owner's role and status can't be changed");
     }
-    if (input.roleId) await this.checkRole(tenantId, input.roleId);
+    if (user.isOwner && input.email === null) {
+      throw new BadRequestException("The owner's email can't be removed");
+    }
+    if (input.roleId) await this.checkRole(actor, input.roleId);
+    this.checkScope(
+      actor,
+      input.allOutlets ?? user.allOutlets,
+      input.outletIds ?? user.outlets.map((o) => o.outletId),
+    );
     if (input.outletIds) await this.checkOutlets(tenantId, input.outletIds);
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -104,21 +122,26 @@ export class StaffService {
           allOutlets: input.allOutlets,
           passwordHash: input.password ? await bcrypt.hash(input.password, 10) : undefined,
           pinHash: input.pin ? await bcrypt.hash(input.pin, 10) : undefined,
+          ...(input.password && { passwordFailures: 0, passwordLockedAt: null }),
+          ...(input.pin && { pinFailures: 0, pinLockedAt: null }),
           outlets: input.outletIds ? outletLinks(tenantId, input.outletIds) : undefined,
         },
         select: staffSelect,
       });
     });
 
-    if (input.status === 'INACTIVE' || input.password) {
+    const emailChanged = input.email !== undefined && input.email !== user.email;
+    if (input.status === 'INACTIVE' || input.password || input.pin || emailChanged) {
       await this.sessions.revokeAllForUser(id);
     }
     return present(updated);
   }
 
-  async remove(tenantId: string, id: string) {
+  async remove(actor: AuthUser, id: string) {
+    const { tenantId } = actor;
     const user = await this.find(tenantId, id);
     if (user.isOwner) throw new BadRequestException("The owner can't be removed");
+    this.checkTarget(actor, user);
 
     await this.prisma.user.update({
       where: { id },
@@ -135,19 +158,23 @@ export class StaffService {
     });
   }
 
-  createRole(tenantId: string, input: RoleDto) {
-    return this.prisma.role.create({ data: { ...input, tenantId } });
+  createRole(actor: AuthUser, input: RoleDto) {
+    this.requireOwner(actor);
+    return this.prisma.role.create({ data: { ...input, tenantId: actor.tenantId } });
   }
 
-  async updateRole(tenantId: string, id: string, input: RoleDto) {
-    const role = await this.findRole(tenantId, id);
+  async updateRole(actor: AuthUser, id: string, input: RoleDto) {
+    this.requireOwner(actor);
+    const role = await this.findRole(actor.tenantId, id);
     if (role.name === 'Owner' && role.isSystem) {
       throw new BadRequestException("The Owner role can't be edited");
     }
     return this.prisma.role.update({ where: { id }, data: input });
   }
 
-  async removeRole(tenantId: string, id: string) {
+  async removeRole(actor: AuthUser, id: string) {
+    this.requireOwner(actor);
+    const { tenantId } = actor;
     const role = await this.findRole(tenantId, id);
     if (role.isSystem) throw new BadRequestException("Default roles can't be deleted");
 
@@ -158,7 +185,10 @@ export class StaffService {
   }
 
   private async find(tenantId: string, id: string) {
-    const user = await this.prisma.user.findFirst({ where: { id, tenantId, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      include: { role: true, outlets: { select: { outletId: true } } },
+    });
     if (!user) throw new NotFoundException('Staff not found');
     return user;
   }
@@ -169,11 +199,51 @@ export class StaffService {
     return role;
   }
 
-  private async checkRole(tenantId: string, roleId: string) {
-    const role = await this.findRole(tenantId, roleId);
+  private async checkRole(actor: AuthUser, roleId: string) {
+    const role = await this.findRole(actor.tenantId, roleId);
     if (role.name === 'Owner' && role.isSystem) {
       throw new BadRequestException('There can only be one owner');
     }
+    this.checkPermissions(actor, role.permissions);
+  }
+
+  private requireOwner(actor: AuthUser) {
+    if (!actor.isOwner) throw new ForbiddenException('Only the owner can change roles');
+  }
+
+  private checkPermissions(actor: AuthUser, permissions: string[]) {
+    if (!actor.isOwner && permissions.some((p) => !actor.permissions.includes(p))) {
+      throw new ForbiddenException("You can't manage staff with permissions you don't have");
+    }
+  }
+
+  private checkScope(actor: AuthUser, allOutlets: boolean, outletIds: string[]) {
+    if (actor.isOwner || actor.outletIds === null) return;
+    if (allOutlets || outletIds.some((id) => !actor.outletIds!.includes(id))) {
+      throw new ForbiddenException("You can't manage staff outside your outlets");
+    }
+  }
+
+  private checkTarget(
+    actor: AuthUser,
+    user: {
+      isOwner: boolean;
+      allOutlets: boolean;
+      role: { permissions: string[] };
+      outlets: { outletId: string }[];
+    },
+  ) {
+    if (!actor.isOwner && user.isOwner) {
+      throw new ForbiddenException('Only the owner can change the owner account');
+    }
+    // Check current access too: resetting a more privileged user's credentials
+    // would let a manager inherit that user's permissions and outlet access.
+    this.checkPermissions(actor, user.role.permissions);
+    this.checkScope(
+      actor,
+      user.allOutlets,
+      user.outlets.map((o) => o.outletId),
+    );
   }
 
   private async checkOutlets(tenantId: string, ids: string[] = []) {

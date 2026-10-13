@@ -10,11 +10,14 @@ import { Sheet } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/switch';
 import { api, errorMessage } from '@/lib/api';
 import type { Role } from '@/lib/types';
+import { useSession } from '@/lib/session';
 
 export function RoleSheet({ role, onClose }: { role: Role | 'new' | null; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { me } = useSession();
   const existing = role && role !== 'new' ? role : null;
-  const locked = existing?.isSystem && existing.name === 'Owner';
+  const ownerRole = existing?.isSystem && existing.name === 'Owner';
+  const locked = !me.user.isOwner || ownerRole;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -62,7 +65,13 @@ export function RoleSheet({ role, onClose }: { role: Role | 'new' | null; onClos
       open={role !== null}
       onClose={onClose}
       title={existing ? existing.name : 'New role'}
-      description={locked ? 'The owner always has full access.' : undefined}
+      description={
+        ownerRole
+          ? 'The owner always has full access.'
+          : !me.user.isOwner
+            ? 'Only the owner can change roles.'
+            : undefined
+      }
       footer={
         locked ? (
           <Button variant="secondary" onClick={onClose}>
@@ -136,7 +145,7 @@ export function RoleSheet({ role, onClose }: { role: Role | 'new' | null; onClos
                 >
                   {PERMISSIONS[p]}
                   <Checkbox
-                    checked={locked || permissions.includes(p)}
+                    checked={permissions.includes(p)}
                     onChange={(on) => toggle(p, on)}
                     disabled={locked}
                   />

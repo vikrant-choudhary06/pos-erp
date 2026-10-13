@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # the desktop app's Electron binary is only needed on the Windows job
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,17 +38,18 @@ jobs:
           POSTGRES_USER: pos
           POSTGRES_PASSWORD: pos
           POSTGRES_DB: pos
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U pos" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://pos:pos@localhost:5432/pos
+      SECURITY_DATABASE_URL: postgresql://pos:pos@localhost:5432/rizzoto_security
       WEB_URL: http://localhost:3000
       OTP_SECRET: ci-only-secret-not-used-anywhere-else
-      DEV_LOGIN_CODE: "111111"
+      DEV_LOGIN_CODE: '111111'
       API_URL: http://localhost:4000
       NEXT_OUTPUT: standalone
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -59,6 +60,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter api db:deploy
       - run: pnpm --filter @pos/shared build && pnpm --filter api build && pnpm --filter web build
+      - name: Security integration tests with PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE DATABASE rizzoto_security'
+          DATABASE_URL="$SECURITY_DATABASE_URL" pnpm --filter api db:deploy
+          pnpm --filter api test:integration
       - run: pnpm --filter web exec playwright install --with-deps chromium
       - name: Start servers
         run: |
@@ -69,11 +75,11 @@ jobs:
           npx --yes wait-on -t 60000 http://localhost:4000/api/health http://localhost:3000
       - run: pnpm e2e
         env:
-          CI: "true"
+          CI: 'true'
       - name: Rizzoto hub, offline across tablets
         run: pnpm --filter window test
         env:
-          CI: "true"
+          CI: 'true'
       - if: failure()
         run: tail -n 100 api.log web.log
       - if: failure()
@@ -87,9 +93,13 @@ jobs:
   desktop:
     runs-on: windows-latest
     needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RIZZOTO_UPDATE_REPO != ''
     env:
       # public repo whose releases installed apps update from ("owner/repo")
       RIZZOTO_UPDATE_REPO: ${{ vars.RIZZOTO_UPDATE_REPO }}
+      RIZZOTO_UPDATE_PUBLISHER: ${{ vars.RIZZOTO_UPDATE_PUBLISHER }}
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -99,6 +109,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @pos/shared build
+      - name: Windows update signature integration test
+        run: pnpm --filter window test:integration
       - name: Build the installer
         working-directory: window
         run: node build.mjs && pnpm exec electron-builder --win --publish never

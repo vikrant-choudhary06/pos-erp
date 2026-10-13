@@ -39,7 +39,11 @@ export function StaffSheet({ staff, roles, onClose }: Props) {
   const [created, setCreated] = useState<Staff | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const assignable = roles.filter((r) => !(r.isSystem && r.name === 'Owner'));
+  const assignable = roles.filter(
+    (r) =>
+      !(r.isSystem && r.name === 'Owner') &&
+      (me.user.isOwner || r.permissions.every((p) => me.permissions.includes(p))),
+  );
 
   useEffect(() => {
     if (!staff) return;

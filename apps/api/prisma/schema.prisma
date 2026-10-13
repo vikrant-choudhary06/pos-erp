@@ -78,6 +78,7 @@ enum OrderStatus {
   OPEN
   BILLED
   PAID
+  CHARGED
   VOID
 }
 
@@ -233,10 +234,11 @@ model Tenant {
   updatedAt    DateTime     @updatedAt
   deletedAt    DateTime?
 
-  outlets       Outlet[]
-  roles         Role[]
-  users         User[]
-  subscriptions Subscription[]
+  outlets         Outlet[]
+  hotelProperties HotelProperty[]
+  roles           Role[]
+  users           User[]
+  subscriptions   Subscription[]
 }
 
 model Subscription {
@@ -285,18 +287,19 @@ model Outlet {
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id])
-  userOutlets UserOutlet[]
-  devices     Device[]
-  printers    Printer[]
-  stations    KitchenStation[]
-  floorAreas  FloorArea[]
-  tables      DiningTable[]
-  menuItems   OutletMenuItem[]
-  prices      MenuItemPrice[]
-  orders      Order[]
-  shifts      Shift[]
-  stocks      OutletStock[]
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  userOutlets   UserOutlet[]
+  devices       Device[]
+  printers      Printer[]
+  stations      KitchenStation[]
+  floorAreas    FloorArea[]
+  tables        DiningTable[]
+  menuItems     OutletMenuItem[]
+  prices        MenuItemPrice[]
+  orders        Order[]
+  shifts        Shift[]
+  stocks        OutletStock[]
+  hotelProperty HotelProperty?
 
   @@unique([tenantId, code])
 }
@@ -322,24 +325,26 @@ model Role {
 // Owners and staff both live here. Owners sign in with email + OTP,
 // staff with business code + employee code + password (or PIN on a POS device).
 model User {
-  id           String     @id @default(uuid(7)) @db.Uuid
-  tenantId     String     @db.Uuid
-  roleId       String     @db.Uuid
-  employeeCode String
-  name         String
-  email        String?
-  phone        String?
-  passwordHash String?
-  pinHash      String?
-  pinFailures  Int        @default(0)
-  pinLockedAt  DateTime?
-  isOwner      Boolean    @default(false)
-  allOutlets   Boolean    @default(false)
-  status       UserStatus @default(ACTIVE)
-  lastLoginAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  deletedAt    DateTime?
+  id               String     @id @default(uuid(7)) @db.Uuid
+  tenantId         String     @db.Uuid
+  roleId           String     @db.Uuid
+  employeeCode     String
+  name             String
+  email            String?
+  phone            String?
+  passwordHash     String?
+  passwordFailures Int        @default(0)
+  passwordLockedAt DateTime?
+  pinHash          String?
+  pinFailures      Int        @default(0)
+  pinLockedAt      DateTime?
+  isOwner          Boolean    @default(false)
+  allOutlets       Boolean    @default(false)
+  status           UserStatus @default(ACTIVE)
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
 
   tenant   Tenant       @relation(fields: [tenantId], references: [id])
   role     Role         @relation(fields: [roleId], references: [id])
@@ -771,14 +776,15 @@ model Order {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  outlet    Outlet          @relation(fields: [outletId], references: [id])
-  table     DiningTable?    @relation(fields: [tableId], references: [id])
-  customer  Customer?       @relation(fields: [customerId], references: [id])
-  items     OrderItem[]
-  kots      Kot[]
-  discounts OrderDiscount[]
-  payments  Payment[]
-  invoices  Invoice[]
+  outlet      Outlet           @relation(fields: [outletId], references: [id])
+  table       DiningTable?     @relation(fields: [tableId], references: [id])
+  customer    Customer?        @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+  kots        Kot[]
+  discounts   OrderDiscount[]
+  payments    Payment[]
+  invoices    Invoice[]
+  hotelCharge HotelFolioEntry?
 
   @@unique([outletId, businessDate, orderNo])
   @@index([tenantId, outletId, businessDate])
@@ -1354,4 +1360,146 @@ model Counter {
   value    Int    @default(0)
 
   @@id([outletId, key])
+}
+
+// Hotel records share the business and outlet access boundary with the POS.
+enum HotelReservationStatus {
+  RESERVED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum HotelRoomStatus {
+  READY
+  DIRTY
+  CLEANING
+  MAINTENANCE
+}
+
+enum HotelEntryKind {
+  ROOM
+  RESTAURANT
+  EXTRA
+  PAYMENT
+  REFUND
+  CREDIT
+}
+
+model HotelProperty {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  tenantId     String             @db.Uuid
+  outletId     String             @unique @db.Uuid
+  name         String
+  businessDate DateTime           @db.Date
+  createdAt    DateTime           @default(now())
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  outlet       Outlet             @relation(fields: [outletId], references: [id])
+  roomTypes    HotelRoomType[]
+  rooms        HotelRoom[]
+  guests       HotelGuest[]
+  reservations HotelReservation[]
+  closings     HotelDayClosing[]
+
+  @@index([tenantId])
+}
+
+model HotelRoomType {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  propertyId  String        @db.Uuid
+  name        String
+  capacity    Int
+  nightlyRate Decimal       @db.Decimal(12, 2)
+  taxPercent  Decimal       @default(0) @db.Decimal(5, 2)
+  property    HotelProperty @relation(fields: [propertyId], references: [id])
+  rooms       HotelRoom[]
+
+  @@unique([propertyId, name])
+}
+
+model HotelRoom {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  propertyId   String             @db.Uuid
+  roomTypeId   String             @db.Uuid
+  number       String
+  floor        String?
+  status       HotelRoomStatus    @default(READY)
+  note         String?
+  property     HotelProperty      @relation(fields: [propertyId], references: [id])
+  roomType     HotelRoomType      @relation(fields: [roomTypeId], references: [id])
+  reservations HotelReservation[]
+
+  @@unique([propertyId, number])
+}
+
+model HotelGuest {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  propertyId   String             @db.Uuid
+  name         String
+  phone        String
+  email        String?
+  createdAt    DateTime           @default(now())
+  property     HotelProperty      @relation(fields: [propertyId], references: [id])
+  reservations HotelReservation[]
+
+  @@index([propertyId, phone])
+}
+
+model HotelReservation {
+  id               String                 @id @default(uuid(7)) @db.Uuid
+  propertyId       String                 @db.Uuid
+  roomId           String                 @db.Uuid
+  guestId          String                 @db.Uuid
+  arrival          DateTime               @db.Date
+  departure        DateTime               @db.Date
+  guests           Int
+  nightlyRate      Decimal                @db.Decimal(12, 2)
+  taxPercent       Decimal                @db.Decimal(5, 2)
+  status           HotelReservationStatus @default(RESERVED)
+  allowRoomCharges Boolean                @default(true)
+  notes            String?
+  checkedInAt      DateTime?
+  checkedOutAt     DateTime?
+  createdAt        DateTime               @default(now())
+  property         HotelProperty          @relation(fields: [propertyId], references: [id])
+  room             HotelRoom              @relation(fields: [roomId], references: [id])
+  guest            HotelGuest             @relation(fields: [guestId], references: [id])
+  entries          HotelFolioEntry[]
+
+  @@index([propertyId, status, arrival])
+  @@index([roomId, arrival, departure])
+}
+
+model HotelFolioEntry {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  reservationId String           @db.Uuid
+  kind          HotelEntryKind
+  description   String
+  // Charges/refunds are positive; payments/credits are negative.
+  amount        Decimal          @db.Decimal(12, 2)
+  taxAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  businessDate  DateTime         @db.Date
+  sourceKey     String
+  orderId       String?          @unique @db.Uuid
+  method        PaymentMethod?
+  reference     String?
+  createdById   String           @db.Uuid
+  createdAt     DateTime         @default(now())
+  reservation   HotelReservation @relation(fields: [reservationId], references: [id])
+  order         Order?           @relation(fields: [orderId], references: [id])
+
+  @@unique([reservationId, sourceKey])
+}
+
+model HotelDayClosing {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  propertyId   String        @db.Uuid
+  businessDate DateTime      @db.Date
+  roomCharges  Decimal       @db.Decimal(12, 2)
+  closedById   String        @db.Uuid
+  createdAt    DateTime      @default(now())
+  property     HotelProperty @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, businessDate])
 }

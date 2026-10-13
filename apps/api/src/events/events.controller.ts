@@ -18,6 +18,6 @@ export class EventsController {
   @Header('X-Accel-Buffering', 'no')
   async stream(@CurrentUser() user: AuthUser, @Query('outletId', ParseUUIDPipe) outletId: string) {
     await this.business.outletFor(user, outletId);
-    return this.events.stream(outletId);
+    return this.events.stream(user, outletId);
   }
 }

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
+    "test": "pnpm build && node --test test/*.test.cjs",
+    "test:integration": "pnpm build && node --test integration/*.test.cjs",
     "start": "node dist/main",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",

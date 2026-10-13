@@ -36,6 +36,6 @@ export class BusinessController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateOutletDto,
   ) {
-    return this.business.updateOutlet(user.tenantId, id, body);
+    return this.business.updateOutlet(user, id, body);
   }
 }

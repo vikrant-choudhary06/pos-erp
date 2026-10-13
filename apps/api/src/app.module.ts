@@ -19,6 +19,7 @@ import { MenuModule } from './menu/menu.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PmsModule } from './pms/pms.module';
 import { ReportsModule } from './reports/reports.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { StaffModule } from './staff/staff.module';
@@ -30,6 +31,7 @@ import { TablesModule } from './tables/tables.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    PmsModule,
     MailModule,
     EventsModule,
     AuditModule,

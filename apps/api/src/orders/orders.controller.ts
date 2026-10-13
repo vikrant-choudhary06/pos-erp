@@ -17,6 +17,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
+import { ChargeRoomDto } from '../pms/dto';
 import { AuthUser, Can, CurrentUser } from '../auth/decorators';
 import { hasPermission } from '../common/permissions';
 import {
@@ -194,6 +195,17 @@ export class OrdersController {
   }
 
   // empty orders can be dropped by the waiter, the service checks the rest
+  @Can('bill.settle', 'hotel.billing')
+  @Post('orders/:id/charge-room')
+  @HttpCode(200)
+  chargeRoom(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ChargeRoomDto,
+  ) {
+    return this.orders.chargeRoom(user, id, body.reservationId);
+  }
+
   @Can('order.take')
   @Post('orders/:id/void')
   @HttpCode(200)

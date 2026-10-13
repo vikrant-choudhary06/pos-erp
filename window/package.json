@@ -11,7 +11,9 @@
     "start": "node build.mjs && electron .",
     "hub": "node build.mjs && node dist/hub-cli.js",
     "dist": "node build.mjs && electron-builder --win",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:integration": "node --test integration/*.test.cjs",
+    "test:security": "node --test test/*.test.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

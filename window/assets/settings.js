@@ -18,7 +18,7 @@ function showStatus(status) {
 
   const addresses = document.getElementById('addresses');
   addresses.innerHTML = '';
-  const list = status.addresses.length ? status.addresses : [`http://localhost:${status.port}`];
+  const list = status.addresses.length ? status.addresses : [status.localOrigin];
   for (const a of list) {
     const code = document.createElement('code');
     code.textContent = `${a}/pos`;
@@ -96,6 +96,8 @@ async function init() {
   showUpdate(update, updates);
   form.cloudUrl.value = config.cloudUrl;
   form.port.value = config.port;
+  form.tlsCertPath.value = config.tlsCertPath;
+  form.tlsKeyPath.value = config.tlsKeyPath;
   form.startWithWindows.checked = config.startWithWindows;
   const printers = await window.rizzoto.printers().catch(() => []);
   fill(form.billPrinter, printers, config.billPrinter);
@@ -113,6 +115,8 @@ form.addEventListener('submit', async (event) => {
     const status = await window.rizzoto.save({
       cloudUrl: form.cloudUrl.value,
       port: Number(form.port.value),
+      tlsCertPath: form.tlsCertPath.value.trim(),
+      tlsKeyPath: form.tlsKeyPath.value.trim(),
       billPrinter: form.billPrinter.value,
       kotPrinter: form.kotPrinter.value,
       startWithWindows: form.startWithWindows.checked,

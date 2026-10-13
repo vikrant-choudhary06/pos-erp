@@ -77,6 +77,7 @@ export class SessionsService {
 
     return {
       sessionId: session.id,
+      expiresAt: session.expiresAt.toISOString(),
       userId: user.id,
       tenantId: user.tenantId,
       isOwner: user.isOwner,
@@ -107,6 +108,35 @@ export class SessionsService {
       where: { id: sessionId },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /** Streams must not extend a session just by staying connected. */
+  async canStream(auth: AuthUser, outletId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: auth.sessionId,
+        userId: auth.userId,
+        tenantId: auth.tenantId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        device: true,
+        user: { include: { tenant: true, outlets: { select: { outletId: true } } } },
+      },
+    });
+    if (!session || (session.device && session.device.status !== 'ACTIVE')) return false;
+    const user = session.user;
+    if (user.status !== 'ACTIVE' || user.deletedAt || user.tenant.deletedAt) return false;
+    if (['SUSPENDED', 'CANCELLED'].includes(user.tenant.status)) return false;
+    if (!user.isOwner && !user.allOutlets && !user.outlets.some((o) => o.outletId === outletId))
+      return false;
+    return Boolean(
+      await this.prisma.outlet.findFirst({
+        where: { id: outletId, tenantId: auth.tenantId, deletedAt: null, isActive: true },
+        select: { id: true },
+      }),
+    );
   }
 
   revokeAllForUser(userId: string) {

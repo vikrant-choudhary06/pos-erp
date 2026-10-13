@@ -118,7 +118,7 @@ export class CustomersController {
 
   @Get(':id')
   get(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.customers.get(user.tenantId, id);
+    return this.customers.get(user, id);
   }
 
   @Post()

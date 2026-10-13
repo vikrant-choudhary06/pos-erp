@@ -48,10 +48,14 @@ export class CustomersService {
     return this.prisma.customer.findUnique({ where: { tenantId_phone: { tenantId, phone } } });
   }
 
-  async get(tenantId: string, id: string) {
-    const customer = await this.find(tenantId, id);
+  async get(user: AuthUser, id: string) {
+    const customer = await this.find(user.tenantId, id);
     const orders = await this.prisma.order.findMany({
-      where: { customerId: id },
+      where: {
+        customerId: id,
+        tenantId: user.tenantId,
+        ...(user.outletIds !== null && { outletId: { in: user.outletIds } }),
+      },
       orderBy: { openedAt: 'desc' },
       take: 20,
       select: {
@@ -84,11 +88,15 @@ export class CustomersService {
     id: string,
     input: { amount: number; method: PaymentMethod; reference?: string },
   ) {
-    const customer = await this.find(user.tenantId, id);
-    const owed = Number(customer.creditBalance);
-    if (input.amount > owed) throw new BadRequestException(`They only owe ₹${owed}`);
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM "Customer" WHERE id = ${id}::uuid AND "tenantId" = ${user.tenantId}::uuid FOR UPDATE
+      `;
+      const customer = await tx.customer.findFirst({ where: { id, tenantId: user.tenantId } });
+      if (!customer) throw new NotFoundException('Customer not found');
+      const owed = Number(customer.creditBalance);
+      if (input.amount > owed) throw new BadRequestException(`They only owe ₹${owed}`);
+
       const row = await tx.customer.update({
         where: { id },
         data: { creditBalance: { decrement: input.amount } },

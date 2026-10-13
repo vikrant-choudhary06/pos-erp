@@ -11,6 +11,7 @@ import { orderEngine as engine } from '@pos/shared';
 import { isLocalMode } from '@/offline/state';
 import { enqueue, flush } from '@/offline/sync';
 import { nextTillNumber } from '@/offline/till';
+import { offlineIdentity } from '@/offline/cache';
 import type { Draft } from './use-pos';
 
 const ACTIVE = ['OPEN', 'BILLED'];
@@ -35,11 +36,17 @@ export function usePosActions(menu: PosMenu) {
 
   // try the server first; if the connection drops on the way, do it locally
   async function either<T>(online: () => Promise<T>, offline: () => Promise<T>) {
-    if (isLocalMode()) return offline();
+    if (isLocalMode()) {
+      await offlineIdentity();
+      return offline();
+    }
     try {
       return await online();
     } catch (err) {
-      if (isOffline(err)) return offline();
+      if (isOffline(err)) {
+        await offlineIdentity();
+        return offline();
+      }
       throw err;
     }
   }

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { keyProtection } from '../src/hub/protection';
 import { expect, test, type APIRequestContext, type Browser } from '@playwright/test';
 import { startHub, type Hub } from '../src/hub';
 
@@ -18,7 +20,13 @@ let base: string;
 
 test.beforeAll(async () => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rizzoto-hub-'));
-  hub = await startHub({ cloudUrl: CLOUD, dataDir, port: 0, host: '127.0.0.1' });
+  hub = await startHub({
+    cloudUrl: CLOUD,
+    dataDir,
+    port: 0,
+    host: '127.0.0.1',
+    protection: keyProtection(randomBytes(32).toString('base64')),
+  });
   base = `http://localhost:${hub.port}`;
 });
 

@@ -3,6 +3,7 @@ import type { Permission } from '@pos/shared';
 
 export interface AuthUser {
   sessionId: string;
+  expiresAt?: string;
   userId: string;
   tenantId: string;
   isOwner: boolean;

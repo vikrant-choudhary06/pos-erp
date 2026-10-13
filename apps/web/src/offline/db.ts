@@ -11,6 +11,8 @@ export type Mutation = {
   /** shown to staff if it can't be synced */
   label: string;
   createdAt: string;
+  userId?: string;
+  tenantId?: string;
   status: 'pending' | 'failed';
   error?: string;
 };

@@ -10,6 +10,7 @@ import {
 import type { LocalEvents } from './events';
 import { hash, HttpError } from './http';
 import type { Store } from './store';
+import { validateMutation } from './validation';
 
 // The part of the API the shop needs while the cloud is away: taking orders,
 // KOTs, bills, payments and the kitchen screen. Each change is applied to the
@@ -17,6 +18,7 @@ import type { Store } from './store';
 // cloud can replay it later. Anything else answers "needs a connection".
 
 type Me = {
+  offlineExpiresAt: string;
   user: { id: string; name: string; isOwner: boolean };
   permissions: string[];
   outlets: { id: string }[];
@@ -39,12 +41,22 @@ export class LocalApi {
   ) {}
 
   meFor(session: string | undefined) {
-    return session ? (this.store.data.cache[`me:${hash(session)}`] as Me | undefined) : undefined;
+    if (session && this.store.data.revokedSessions[hash(session)]) return undefined;
+    const me = session
+      ? (this.store.data.cache[`me:${hash(session)}`] as Me | undefined)
+      : undefined;
+    return me && Date.parse(me.offlineExpiresAt) > Date.now() ? me : undefined;
+  }
+
+  authorizeOutlet(session: string | undefined, outletId: string) {
+    const me = this.meFor(session);
+    if (!me) throw new HttpError(401, 'Please sign in again');
+    this.checkOutlet({ me, session: session! }, outletId);
+    return me;
   }
 
   async handle(method: string, url: URL, session: string | undefined, body: any): Promise<Reply> {
     const path = url.pathname.replace(/^\/api/, '');
-    const query = url.search;
 
     if (path === '/health') return ok({ status: 'ok', hub: true });
     if (path === '/devices/me') return ok(null);
@@ -57,14 +69,22 @@ export class LocalApi {
     if (method === 'GET') {
       if (path === '/auth/me') return ok(me);
       if (path === '/orders/active') return ok(this.active(ctx, url.searchParams.get('outletId')));
-      if (path === '/kitchen/tickets') return ok(this.tickets(url.searchParams.get('outletId')));
+      if (path === '/kitchen/tickets') {
+        this.checkOutlet(ctx, url.searchParams.get('outletId') ?? '');
+        return ok(this.tickets(url.searchParams.get('outletId')));
+      }
       if (path === '/customers/lookup') return ok(null);
       if (order && !order[2]) return ok(this.order(ctx, order[1]));
-      const cached = this.store.data.cache[path + query];
+      const outletId =
+        url.searchParams.get('outletId') ?? path.match(/^\/outlets\/([^/]+)\/stations$/)?.[1];
+      if (outletId) this.checkOutlet(ctx, outletId);
+      if (path === '/shifts/current') this.require(ctx, 'shift.manage');
+      const cached = this.store.data.cache[`session:${hash(session!)}:${path}${url.search}`];
       if (cached !== undefined) return ok(cached);
       throw bad("This isn't available offline");
     }
 
+    validateMutation(method, path, body);
     if (method === 'POST' && path === '/orders') return ok(this.create(ctx, body ?? {}));
 
     const ticket = path.match(/^\/kitchen\/tickets\/([^/]+)$/);
@@ -151,11 +171,13 @@ export class LocalApi {
     this.require(ctx, 'order.take');
     const { outletId, type, tableId } = body;
     if (!UUID.test(body.id ?? '')) throw bad('Order id is missing');
-    if (this.store.data.orders[body.id]) return this.store.data.orders[body.id];
+    if (this.store.data.orders[body.id]) return this.order(ctx, body.id);
     this.checkOutlet(ctx, outletId);
 
     const menu = this.menu(outletId);
     const till = this.till(outletId);
+    if (type === 'DINE_IN' && !tableId) throw bad('Pick a table for a dine-in order');
+    if (tableId && !menu.tables.some((t) => t.id === tableId)) throw bad('Unknown table');
     if (tableId) this.checkTableFree(outletId, tableId);
 
     const date = today(menu);
@@ -186,6 +208,8 @@ export class LocalApi {
     this.require(ctx, 'order.take');
     this.checkOpen(order);
     if (patch.type && patch.type !== order.type) throw needsConnection('Changing the order type');
+    if (patch.tableId && !this.menu(order.outletId).tables.some((t) => t.id === patch.tableId))
+      throw bad('Unknown table');
     if (patch.tableId) this.checkTableFree(order.outletId, patch.tableId, order.id);
 
     const next = engine.update(order, patch, this.menu(order.outletId));
@@ -201,6 +225,22 @@ export class LocalApi {
     const lines = (body?.items ?? []).map((line: any) => {
       const item = menu.items.find((i) => i.id === line.menuItemId);
       if (!item) throw bad('That item is no longer on the menu');
+      if (item.outOfStock) throw bad('That item is out of stock');
+      if (
+        (item.hasVariants && !line.variantId) ||
+        (line.variantId && !item.variants.some((v) => v.id === line.variantId))
+      )
+        throw bad('Choose a valid variant');
+      const options: string[] = line.modifierOptionIds ?? [];
+      if (
+        options.some((id) => !item.modifierGroups.some((g) => g.options.some((o) => o.id === id)))
+      )
+        throw bad('Unknown modifier');
+      for (const group of item.modifierGroups) {
+        const count = group.options.filter((o) => options.includes(o.id)).length;
+        if (count < group.minSelect || count > group.maxSelect)
+          throw bad('Choose the required modifiers');
+      }
       if (!UUID.test(line.id ?? '')) throw bad('Item id is missing');
       return {
         id: line.id,
@@ -330,14 +370,24 @@ export class LocalApi {
     this.require(ctx, 'bill.settle');
     if (order.status !== 'OPEN' && order.status !== 'BILLED') throw bad('This order is closed');
     const shift = this.store.data.cache[`/shifts/current?outletId=${order.outletId}`];
-    if (shift === null) throw bad('Open a cash shift before taking payments');
+    if (!shift) throw bad('Open a cash shift before taking payments');
+    if (body.tip) throw needsConnection('Adding a tip');
 
-    const payments = (body?.payments ?? []).map((p: any) => ({
-      id: p.id,
-      method: p.method,
-      amount: Number(p.amount),
-      reference: p.reference,
-    }));
+    const payments = (body?.payments ?? [])
+      .filter((p: any) => !order.payments.some((old) => old.id === p.id))
+      .map((p: any) => ({
+        id: p.id,
+        method: p.method,
+        amount: Number(p.amount),
+        reference: p.reference,
+      }));
+    if (body.payments.length && !payments.length) return { order, change: 0 };
+    // Check payment rules before billing changes status or allocates invoice numbers.
+    try {
+      engine.pay(order, payments);
+    } catch (err) {
+      throw bad((err as Error).message);
+    }
     let current = order;
     if (current.status === 'OPEN') current = this.bill(ctx, current).order;
 

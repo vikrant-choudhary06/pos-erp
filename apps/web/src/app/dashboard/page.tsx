@@ -192,8 +192,8 @@ function TodayCard() {
       </p>
       <p className="tabular mt-1 text-[13px] text-ink-faint">
         {data?.summary.orders
-          ? `${data.summary.orders} paid orders · ${formatMoney(data.summary.averageBill)} average`
-          : 'Paid bills show up here as soon as they are settled.'}
+          ? `${data.summary.orders} completed orders · ${formatMoney(data.summary.averageBill)} average`
+          : 'Completed bills, including hotel room charges, show up here.'}
       </p>
     </Link>
   );

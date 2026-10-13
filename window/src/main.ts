@@ -1,6 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  Notification,
+  safeStorage,
+  shell,
+  Tray,
+} from 'electron';
 import { cleanUrl, loadConfig, saveConfig, type Config } from './config';
 import { startHub, type Hub, type HubStatus } from './hub';
 import { printSilently } from './printing';
@@ -74,10 +84,26 @@ async function runHub() {
   // right after an update the old copy can still be letting go of the port
   for (let attempt = 1; !started; attempt++) {
     try {
+      if (
+        !safeStorage.isEncryptionAvailable() ||
+        (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')
+      ) {
+        throw new Error(
+          'OS credential encryption is unavailable. Unlock your operating system key store and restart.',
+        );
+      }
       started = await startHub({
         cloudUrl: config.cloudUrl,
         port: config.port,
         dataDir: path.join(app.getPath('userData'), 'hub'),
+        protection: {
+          encrypt: (plain) => safeStorage.encryptString(plain),
+          decrypt: (cipher) => safeStorage.decryptString(cipher),
+        },
+        tls:
+          config.tlsCertPath && config.tlsKeyPath
+            ? { cert: fs.readFileSync(config.tlsCertPath), key: fs.readFileSync(config.tlsKeyPath) }
+            : undefined,
         log,
       });
     } catch (err) {
@@ -168,7 +194,7 @@ function showMain() {
       sandbox: true,
     },
   });
-  const home = `http://localhost:${hub.port}`;
+  const home = hub.status().localOrigin;
 
   main.once('ready-to-show', () => {
     main?.maximize();
@@ -316,8 +342,15 @@ ipcMain.handle('settings:save', async (_e, input: Partial<Config>) => {
     port: Number(input.port) || config.port,
   };
   if (!next.cloudUrl) throw new Error('Enter the web address of your Rizzoto account');
+  if (!!next.tlsCertPath !== !!next.tlsKeyPath)
+    throw new Error('Provide both the HTTPS certificate and private key paths');
 
-  const restart = !hub || next.cloudUrl !== config.cloudUrl || next.port !== config.port;
+  const restart =
+    !hub ||
+    next.cloudUrl !== config.cloudUrl ||
+    next.port !== config.port ||
+    next.tlsCertPath !== config.tlsCertPath ||
+    next.tlsKeyPath !== config.tlsKeyPath;
   config = next;
   saveConfig(config);
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.startWithWindows });

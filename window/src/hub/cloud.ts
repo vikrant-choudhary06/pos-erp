@@ -1,6 +1,6 @@
 import http, { type IncomingHttpHeaders, type IncomingMessage } from 'node:http';
 import https from 'node:https';
-import { cookieHeader, DEVICE_COOKIE, parseJson, SESSION_COOKIE } from './http';
+import { cookieHeader, DEVICE_COOKIE, HttpError, parseJson, SESSION_COOKIE } from './http';
 import type { Store } from './store';
 
 export type CloudReply = { status: number; headers: IncomingHttpHeaders; body: Buffer };
@@ -14,21 +14,45 @@ export class Cloud {
     private store: Store,
   ) {
     this.base = new URL(url);
+    if (
+      !['http:', 'https:'].includes(this.base.protocol) ||
+      this.base.username ||
+      this.base.password
+    )
+      throw new Error('Invalid cloud address');
+    if (
+      this.base.protocol === 'http:' &&
+      !['localhost', '127.0.0.1', '[::1]'].includes(this.base.hostname)
+    )
+      throw new Error('The cloud address must use HTTPS');
   }
 
   get origin() {
     return this.base.origin;
   }
 
-  /** Raw request; rejects only when the cloud can't be reached at all. */
+  /** Only origin-form paths may be forwarded, never client-selected hosts. */
+  resolveTarget(path: string): URL {
+    if (!path.startsWith('/') || path.startsWith('//') || /[\\\u0000-\u0020\u007f#]/.test(path)) {
+      throw new HttpError(400, 'Invalid request target');
+    }
+    const target = new URL(path, this.base);
+    if (target.origin !== this.origin || target.username || target.password) {
+      throw new HttpError(400, 'Invalid request target');
+    }
+    return target;
+  }
+
+  /** Validate before opening a socket or sending any credentials. */
   open(
     method: string,
     path: string,
     headers: http.OutgoingHttpHeaders,
     timeout = 8000,
   ): http.ClientRequest {
+    const target = this.resolveTarget(path);
     const lib = this.base.protocol === 'https:' ? https : http;
-    return lib.request(new URL(path, this.base), { method, headers, timeout });
+    return lib.request(target, { method, headers, timeout });
   }
 
   request(

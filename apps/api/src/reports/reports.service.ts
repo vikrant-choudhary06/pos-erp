@@ -17,7 +17,7 @@ export class ReportsService {
 
   async sales(user: AuthUser, range: Range) {
     const scope = await this.scope(user, range);
-    const paid = Prisma.sql`o."status" = 'PAID' AND ${scope}`;
+    const paid = Prisma.sql`o."status" IN ('PAID', 'CHARGED') AND ${scope}`;
 
     const [summary] = await this.prisma.$queryRaw<Record<string, unknown>[]>`
       SELECT count(*) AS orders,
@@ -120,7 +120,7 @@ export class ReportsService {
       JOIN "Order" o ON o."id" = i."orderId"
       LEFT JOIN "MenuItem" m ON m."id" = i."menuItemId"
       LEFT JOIN "MenuCategory" c ON c."id" = m."categoryId"
-      WHERE o."status" = 'PAID' AND i."status" <> 'CANCELLED' AND ${scope}
+      WHERE o."status" IN ('PAID', 'CHARGED') AND i."status" <> 'CANCELLED' AND ${scope}
       GROUP BY i."menuItemId", i."itemName", i."variantName", c."name"
       ORDER BY total DESC`;
 

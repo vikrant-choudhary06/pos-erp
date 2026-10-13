@@ -11,12 +11,14 @@ import { Tabs } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { Role, Staff } from '@/lib/types';
+import { useSession } from '@/lib/session';
 import { RoleSheet } from './role-sheet';
 import { StaffSheet } from './staff-sheet';
 
 type View = 'staff' | 'roles';
 
 export default function StaffPage() {
+  const { me } = useSession();
   const [view, setView] = useState<View>('staff');
   const [editingStaff, setEditingStaff] = useState<Staff | 'new' | null>(null);
   const [editingRole, setEditingRole] = useState<Role | 'new' | null>(null);
@@ -34,11 +36,11 @@ export default function StaffPage() {
             <Button onClick={() => setEditingStaff('new')}>
               <Plus className="size-4" /> Add staff
             </Button>
-          ) : (
+          ) : me.user.isOwner ? (
             <Button onClick={() => setEditingRole('new')}>
               <Plus className="size-4" /> New role
             </Button>
-          )
+          ) : null
         }
       />
 
@@ -72,6 +74,13 @@ export default function StaffPage() {
               >
                 <button
                   onClick={() => setEditingStaff(person)}
+                  disabled={
+                    !me.user.isOwner &&
+                    (person.isOwner ||
+                      !roles.data
+                        ?.find((r) => r.id === person.role.id)
+                        ?.permissions.every((p) => me.permissions.includes(p)))
+                  }
                   className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-paper/60 sm:grid-cols-[1.6fr_1fr_1.2fr_auto]"
                 >
                   <div className="flex min-w-0 items-center gap-3">

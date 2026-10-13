@@ -63,7 +63,7 @@ export type Order = {
   orderNo: string;
   businessDate: string;
   type: OrderType;
-  status: 'OPEN' | 'BILLED' | 'PAID' | 'VOID';
+  status: 'OPEN' | 'BILLED' | 'PAID' | 'CHARGED' | 'VOID';
   tableId: string | null;
   table: { id: string; name: string } | null;
   covers: number | null;

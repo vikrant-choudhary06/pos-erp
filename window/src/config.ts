@@ -5,6 +5,8 @@ import { app } from 'electron';
 export type Config = {
   cloudUrl: string;
   port: number;
+  tlsCertPath: string;
+  tlsKeyPath: string;
   billPrinter: string;
   kotPrinter: string;
   startWithWindows: boolean;
@@ -13,6 +15,8 @@ export type Config = {
 const DEFAULTS: Config = {
   cloudUrl: '',
   port: 7400,
+  tlsCertPath: '',
+  tlsKeyPath: '',
   billPrinter: '',
   kotPrinter: '',
   startWithWindows: true,

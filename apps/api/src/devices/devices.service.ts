@@ -121,36 +121,50 @@ export class DevicesService {
     const device = await this.fromToken(token);
     if (!device) throw new UnauthorizedException('This device is not set up');
 
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId, tenantId: device.tenantId, deletedAt: null, status: 'ACTIVE' },
-      include: { outlets: { select: { outletId: true } } },
-    });
-    const allowed =
-      user &&
-      (user.isOwner || user.allOutlets || user.outlets.some((o) => o.outletId === device.outletId));
-    if (!user || !allowed || !user.pinHash) throw new UnauthorizedException('Wrong PIN');
+    const user = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`
+        SELECT id FROM "User" WHERE id = ${userId}::uuid AND "tenantId" = ${device.tenantId}::uuid FOR UPDATE
+      `;
+        const user = await tx.user.findFirst({
+          where: { id: userId, tenantId: device.tenantId, deletedAt: null, status: 'ACTIVE' },
+          include: { outlets: { select: { outletId: true } } },
+        });
+        const allowed =
+          user &&
+          (user.isOwner ||
+            user.allOutlets ||
+            user.outlets.some((o) => o.outletId === device.outletId));
+        if (!user || !allowed || !user.pinHash) return null;
 
-    if (user.pinLockedAt && Date.now() - user.pinLockedAt.getTime() < LOCK_MINUTES * 60_000) {
-      throw new UnauthorizedException(`Too many wrong PINs. Try again in ${LOCK_MINUTES} minutes.`);
+        if (user.pinLockedAt && Date.now() - user.pinLockedAt.getTime() < LOCK_MINUTES * 60_000) {
+          return null;
+        }
+
+        const ok = await bcrypt.compare(pin, user.pinHash);
+        if (!ok) {
+          const failures = user.pinLockedAt ? 1 : user.pinFailures + 1;
+          await tx.user.update({
+            where: { id: user.id },
+            data:
+              failures >= MAX_PIN_FAILURES
+                ? { pinFailures: failures, pinLockedAt: new Date() }
+                : { pinFailures: failures, pinLockedAt: null },
+          });
+          return null;
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: { pinFailures: 0, pinLockedAt: null },
+        });
+        return user;
+      },
+      { timeout: 10_000 },
+    );
+    if (!user) {
+      throw new UnauthorizedException('Wrong PIN or too many attempts. Try again in five minutes.');
     }
-
-    const ok = await bcrypt.compare(pin, user.pinHash);
-    if (!ok) {
-      const failures = user.pinFailures + 1;
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data:
-          failures >= MAX_PIN_FAILURES
-            ? { pinFailures: 0, pinLockedAt: new Date() }
-            : { pinFailures: failures },
-      });
-      throw new UnauthorizedException('Wrong PIN');
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { pinFailures: 0, pinLockedAt: null },
-    });
     const session = await this.sessions.create(user, meta, device.id, 1);
     return { ...session, outletId: device.outletId };
   }
