@@ -111,16 +111,35 @@ jobs:
       - run: pnpm --filter @pos/shared build
       - name: Windows update signature integration test
         run: pnpm --filter window test:integration
+      - name: Check signed release configuration
+        id: signing
+        shell: pwsh
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          $required = @('RIZZOTO_UPDATE_REPO', 'RIZZOTO_UPDATE_PUBLISHER', 'CSC_LINK', 'CSC_KEY_PASSWORD', 'RELEASES_TOKEN')
+          $missing = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+          if ($missing.Count -gt 0) {
+            'ready=false' >> $env:GITHUB_OUTPUT
+            $message = "Signed desktop release skipped. Missing configuration: $($missing -join ', '). Windows signature tests still ran."
+            Write-Output "::warning::$message"
+            $message >> $env:GITHUB_STEP_SUMMARY
+            'Configure RIZZOTO_UPDATE_PUBLISHER and the WINDOWS_CSC_LINK, WINDOWS_CSC_KEY_PASSWORD and RELEASES_TOKEN secrets before publishing a signed production update.' >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            'ready=true' >> $env:GITHUB_OUTPUT
+          }
       - name: Build the installer
+        if: steps.signing.outputs.ready == 'true'
         working-directory: window
         run: node build.mjs && pnpm exec electron-builder --win --publish never
       - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.ready == 'true'
         with:
           name: rizzoto-windows
           path: window/release/*.exe
       # a new version in window/package.json reaches every counter PC from here
       - name: Publish the update
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RIZZOTO_UPDATE_REPO != ''
+        if: steps.signing.outputs.ready == 'true'
         shell: bash
         env:
           # token that can write releases on that repo

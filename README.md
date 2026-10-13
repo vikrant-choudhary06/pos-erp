@@ -131,6 +131,10 @@ producing an unsigned installer. Update-enabled builds pin the certificate publi
 verify downloaded installers, and use the HTTPS GitHub release feed. The desktop CI job
 runs on pushes to `main` when an update repository is configured.
 
+If release configuration is incomplete, CI still runs the Windows signature tests and
+reports the missing settings in its summary, but skips installer creation and publishing.
+Once configuration is complete, signing or publishing failures fail the desktop job.
+
 ### Security integration tests
 
 Use a separate local PostgreSQL database named `rizzoto_security`, apply migrations with
