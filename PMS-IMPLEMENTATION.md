@@ -31,6 +31,8 @@ The migration was applied only to the isolated `rizzoto_security` database durin
 
 Hotel operations require the cloud connection. The restaurant's existing offline mode does not queue hotel reservations or room-charge transfers.
 
+Desktop 0.1.2 was built with the current security fixes and signed using the local `Rizzoto Local Test` certificate. All three desktop integration tests passed against the actual installer and packaged application, including startup, encrypted data after restart and signature rejection checks. This is a test installer with automatic updates disabled; the self-signed certificate is not generally trusted on other PCs. PMS still needs the updated cloud API, database migration and web deployment.
+
 ## Verification
 
 Completed checks: all 17 existing security scenarios and 12 PMS backend scenarios passed (the Node runner reports 30 passing tests including the PMS parent test). Workspace TypeScript checks, API build and web production build passed. A separate real Chrome run completed room setup → reservation → check-in → POS room transfer → combined payment → checkout. Desktop calendar and mobile housekeeping screenshots were visually inspected.

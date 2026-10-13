@@ -42,7 +42,7 @@ test('signed packaged app starts, isolates settings and decrypts persisted data 
     }, secret);
     assert.equal(fs.realpathSync(info.directory), fs.realpathSync(dir));
     assert.equal(info.packaged, true);
-    assert.equal(info.version, '0.1.1');
+    assert.equal(info.version, require('../package.json').version);
     assert.equal(info.encryption, true);
     assert.equal(info.containsPlaintext, false);
     fs.writeFileSync(path.join(dir, 'runtime-encrypted.bin'), Buffer.from(info.encrypted, 'base64'));

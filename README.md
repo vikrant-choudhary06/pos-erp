@@ -146,7 +146,7 @@ The suite also validates the installer YAML against the installed electron-build
 To test an existing signed installer as well, set `RIZZOTO_TEST_SIGNED_INSTALLER` to its
 absolute path and `RIZZOTO_TEST_SIGNED_PUBLISHER` to its exact certificate publisher
 before running the Windows integration tests. Its certificate must be trusted locally.
-Set `RIZZOTO_TEST_PACKAGED_EXE` to the absolute path of the signed 0.1.1 application
+Set `RIZZOTO_TEST_PACKAGED_EXE` to the absolute path of the signed application matching `window/package.json`
 to also test packaged startup, isolated settings and Windows encryption after restart.
 This uses a temporary profile and does not change the installed app's data.
 
