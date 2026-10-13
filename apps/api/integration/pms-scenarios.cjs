@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
-const { hotelToday, hotelDate, hotelDateKey, addHotelDays } = require('@pos/shared');
+const { hotelToday, hotelDate, hotelDateKey, addHotelDays, HOTEL_DEFAULT_ROLES } = require('@pos/shared');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // These scenarios use the running Nest API and real PostgreSQL records.
 module.exports = async function pmsScenarios(
@@ -63,18 +65,88 @@ module.exports = async function pmsScenarios(
   });
   const account = (stay) => `${root}/reservations/${stay.id}`;
 
+  await t.test('hotel role migration adds missing defaults without changing custom roles', async () => {
+    const legacy = await db.tenant.create({
+      data: {
+        name: 'Legacy hotel role migration test',
+        businessCode: `LEGACY-${randomUUID()}`,
+        businessType: 'RESTAURANT',
+        email: `${randomUUID()}@example.invalid`,
+        phone: '9876543210',
+      },
+    });
+    const custom = await db.role.create({
+      data: {
+        tenantId: legacy.id,
+        name: 'Receptionist',
+        description: 'Owner customised reception access',
+        permissions: ['hotel.view'],
+      },
+    });
+    const migration = fs.readFileSync(
+      path.resolve(__dirname, '../prisma/migrations/20261013190000_hotel_staff_roles/migration.sql'),
+      'utf8',
+    );
+    await db.$executeRawUnsafe(migration);
+    await db.$executeRawUnsafe(migration);
+    const roles = await db.role.findMany({ where: { tenantId: legacy.id } });
+    assert.equal(roles.length, HOTEL_DEFAULT_ROLES.length);
+    assert.deepEqual(roles.find((role) => role.id === custom.id), custom);
+    for (const expected of HOTEL_DEFAULT_ROLES.filter((role) => role.name !== 'Receptionist')) {
+      const actual = roles.find((role) => role.name === expected.name);
+      assert.ok(actual?.isSystem);
+      assert.deepEqual(actual.permissions, expected.permissions);
+      assert.equal(actual.description, expected.description);
+    }
+  });
+
+  await t.test('default hotel roles allow their work and reject privileged actions', async () => {
+    const roles = (await request(owner, 'GET', '/roles')).data;
+    const actors = {};
+    for (const expected of HOTEL_DEFAULT_ROLES) {
+      const role = roles.find((role) => role.name === expected.name);
+      assert.ok(role?.isSystem);
+      assert.deepEqual(role.permissions, expected.permissions);
+      const person = await staff(`Default ${expected.name}`);
+      await request(owner, 'PATCH', `/staff/${person.id}`, { roleId: role.id });
+      actors[expected.name] = await staffSession(person);
+    }
+    const r = await room();
+    const stay = (
+      await request(actors.Receptionist, 'POST', `${root}/reservations`, payload(r), 201)
+    ).data;
+    await request(actors.Receptionist, 'POST', `${account(stay)}/check-in`, undefined, 201);
+    await request(actors.Receptionist, 'POST', `${account(stay)}/entries`, payment(100), 201);
+    await request(actors.Receptionist, 'PATCH', `${root}/room-types/${type.id}`, { nightlyRate: 500 }, 403);
+    await request(actors.Receptionist, 'POST', `${root}/close-day`, { date: today }, 403);
+    await request(actors.Cleaner, 'GET', account(stay), undefined, 403);
+    await request(actors.Cleaner, 'GET', `${root}/reservations?from=${today}&to=${day(1)}`, undefined, 403);
+    const cleaned = await room();
+    await request(actors.Cleaner, 'PATCH', `${root}/rooms/${cleaned.id}/status`, { status: 'CLEANING' });
+    await request(actors.Cleaner, 'PATCH', `${root}/rooms/${cleaned.id}/status`, { status: 'READY' });
+    await request(actors.Cleaner, 'PATCH', `${root}/rooms/${cleaned.id}/status`, { status: 'MAINTENANCE' }, 403);
+    for (const actor of [actors.Receptionist, actors['Night Auditor']]) {
+      await request(actor, 'POST', `${account(stay)}/entries`, {
+        id: randomUUID(), kind: 'REFUND', amount: 10, description: 'Restricted refund', method: 'CASH',
+      }, 403);
+    }
+    await request(actors['Night Auditor'], 'GET', `${root}/report?from=${today}&to=${day(1)}`);
+    await request(actors['Night Auditor'], 'POST', `${root}/reservations`, payload(cleaned), 403);
+    await request(actors['Night Auditor'], 'POST', `${root}/close-day`, { date: today }, 400);
+    await request(actors['Hotel Manager'], 'POST', `${account(stay)}/entries`, {
+      id: randomUUID(), kind: 'REFUND', amount: 10, description: 'Manager authorised refund', method: 'CASH',
+    }, 201);
+    await request(actors['Hotel Manager'], 'PATCH', `${root}/room-types/${type.id}`, { nightlyRate: 1000 });
+    await request(actors['Hotel Manager'], 'GET', '/staff', undefined, 403);
+    await request(owner, 'POST', `${account(stay)}/entries`, payment(960), 201);
+    await request(actors.Receptionist, 'POST', `${account(stay)}/check-out`, undefined, 201);
+  });
+
   await t.test('hotel access is scoped by business, outlet and role', async () => {
     await request(outsider, 'GET', `${root}/rooms`, undefined, 404);
     const person = await staff('Hotel housekeeper');
-    const role = (
-      await request(
-        owner,
-        'POST',
-        '/roles',
-        { name: 'Housekeeper integration', permissions: ['hotel.housekeeping'] },
-        201,
-      )
-    ).data;
+    const roles = (await request(owner, 'GET', '/roles')).data;
+    const role = roles.find((role) => role.name === 'Cleaner');
     await request(owner, 'PATCH', `/staff/${person.id}`, { roleId: role.id });
     const actor = await staffSession(person);
     await request(actor, 'GET', `${root}/rooms`);

@@ -56,6 +56,37 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
   },
 ];
 
+export const HOTEL_DEFAULT_ROLES: { name: string; description: string; permissions: Permission[] }[] = [
+  {
+    name: 'Hotel Manager',
+    description: 'Hotel setup, reception, guest payments, refunds, housekeeping and daily closing',
+    permissions: [
+      'hotel.view',
+      'hotel.manage',
+      'hotel.frontdesk',
+      'hotel.billing',
+      'hotel.housekeeping',
+      'hotel.close_day',
+      'reports.view',
+    ],
+  },
+  {
+    name: 'Receptionist',
+    description: 'Hotel reservations, check-in/out and guest payments',
+    permissions: ['hotel.view', 'hotel.frontdesk', 'hotel.billing'],
+  },
+  {
+    name: 'Cleaner',
+    description: 'Room cleaning status only; no guest details or payments',
+    permissions: ['hotel.housekeeping'],
+  },
+  {
+    name: 'Night Auditor',
+    description: 'Review guest accounts, record payments, view reports and close completed hotel days',
+    permissions: ['hotel.view', 'hotel.billing', 'hotel.close_day', 'reports.view'],
+  },
+];
+
 // Roles every new business starts with. Owners can edit or add more later.
 export const DEFAULT_ROLES: { name: string; description: string; permissions: Permission[] }[] = [
   { name: 'Owner', description: 'Full access', permissions: ALL_PERMISSIONS },
@@ -71,11 +102,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: Pe
   },
   { name: 'Waiter', description: 'Takes orders at tables', permissions: ['order.take'] },
   { name: 'Chef', description: 'Kitchen display only', permissions: ['kitchen.view'] },
-  {
-    name: 'Receptionist',
-    description: 'Hotel reservations and guest payments',
-    permissions: ['hotel.view', 'hotel.frontdesk', 'hotel.billing'],
-  },
+  ...HOTEL_DEFAULT_ROLES,
   {
     name: 'Housekeeping',
     description: 'Room cleaning status only',

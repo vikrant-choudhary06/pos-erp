@@ -19,7 +19,14 @@ Implemented on 13 October 2026. This is a hotel operations module in the existin
 
 ## Permissions
 
-Owners have full access. Configure existing staff roles with the new Hotel permission group. New businesses also receive Receptionist and Housekeeping roles. Existing role records are not automatically widened.
+Owners have full access. New businesses receive Hotel Manager, Receptionist, Cleaner and Night Auditor roles, as well as the existing Housekeeping role. Migration `20261013190000_hotel_staff_roles` adds missing hotel roles to existing active businesses. Existing roles with the same name, their permissions and staff assignments are preserved. Owners assign roles and outlets under Staff; the legacy Housekeeping role remains available.
+
+| Role | Access |
+| --- | --- |
+| Hotel Manager | Hotel setup, reception, guest payments, refunds/credits, housekeeping, reports and daily closing; no staff administration or restaurant management |
+| Receptionist | Reservations, check-in/out and guest payments; no refunds/credits, rate changes or daily closing |
+| Cleaner | Room cleaning status and occupancy only; no guest details, accounts or payments |
+| Night Auditor | Guest accounts, payments, reports and daily closing; no reservations/check-in changes, room setup or refunds/credits |
 
 Reception needs `hotel.view`, `hotel.frontdesk` and `hotel.billing`. Housekeeping needs `hotel.housekeeping`. Hotel setup and credits/refunds require `hotel.manage`; daily closing requires `hotel.close_day`. Reports also require `reports.view`. POS room charging requires `bill.settle` and `hotel.billing`; the guest-selection UI also requires `hotel.view`.
 
@@ -36,6 +43,8 @@ Desktop 0.1.2 was built with the current security fixes and signed using the loc
 ## Verification
 
 Completed checks: all 17 existing security scenarios and 12 PMS backend scenarios passed (the Node runner reports 30 passing tests including the PMS parent test). Workspace TypeScript checks, API build and web production build passed. A separate real Chrome run completed room setup → reservation → check-in → POS room transfer → combined payment → checkout. Desktop calendar and mobile housekeeping screenshots were visually inspected.
+
+Hotel staff role follow-up: all 32 API integration tests passed, including default-role permissions through real staff logins and migration reruns against PostgreSQL. Missing roles were added without duplicates and an existing customised Receptionist role remained unchanged. Workspace TypeScript checks also passed.
 
 The integration suite starts the actual Nest API and uses PostgreSQL. It creates real persisted test businesses, rooms, guests, reservations, payments and restaurant orders. No API, database or payment-service mocks are used; these are test records, not production customer data.
 
