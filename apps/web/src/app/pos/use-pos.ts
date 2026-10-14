@@ -11,12 +11,12 @@ import { isLocalMode } from '@/offline/state';
 
 export { useBillHeader } from '@/lib/use-bill-header';
 
-export function usePosMenu() {
+export function usePosMenu(enabled = true) {
   const { outletId } = useSession();
   return useQuery({
     queryKey: ['pos-menu', outletId],
     queryFn: () => cachedApi<PosMenu>(`pos-menu:${outletId}`, `/pos/menu?outletId=${outletId}`),
-    enabled: Boolean(outletId),
+    enabled: Boolean(outletId) && enabled,
     staleTime: 5 * 60_000,
   });
 }

@@ -66,9 +66,11 @@ async function request(actor, method, route, body, status = 200) {
 }
 
 async function loginCode(email) {
+  const offset = logs.length;
   await request(null, 'POST', '/auth/code', { email });
   return until(() => {
     const line = logs
+      .slice(offset)
       .split('\n')
       .reverse()
       .find((value) => value.includes(`Login code for ${email}:`));
@@ -257,7 +259,7 @@ before(
     if (process.env.PMS_UI_TEST === '1') {
       const webSocket = net.createServer();
       await new Promise((resolve) => webSocket.listen(0, '127.0.0.1', resolve));
-      webOrigin = `http://127.0.0.1:${webSocket.address().port}`;
+      webOrigin = `http://localhost:${webSocket.address().port}`;
       await new Promise((resolve) => webSocket.close(resolve));
     }
     await startApi();
@@ -712,7 +714,7 @@ test(
         'hotel browser workflow uses real guest records and payments',
         { timeout: 240_000 },
         async () => {
-          await require('./pms-browser.cjs')({ api, webOrigin, owner, billedOrder });
+          await require('./pms-browser.cjs')({ api, webOrigin, owner, billedOrder, loginCode });
         },
       );
     }

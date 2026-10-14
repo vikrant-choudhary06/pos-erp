@@ -14,14 +14,46 @@ import { hotelToday } from '@pos/shared';
 import type { HotelProperty } from './types';
 import { BranchSetup } from './branch-setup';
 
-const Context = createContext<{ property: HotelProperty; today: string } | null>(null);
+const Context = createContext<{
+  property: HotelProperty;
+  today: string;
+  navigate?: (path: string) => void;
+} | null>(null);
+export function HotelLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const hotel = useContext(Context);
+  return hotel?.navigate ? (
+    <button type="button" className={className} onClick={() => hotel.navigate?.(href)}>
+      {children}
+    </button>
+  ) : (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
 export function useHotel() {
   const value = useContext(Context);
   if (!value) throw new Error('Hotel context is missing');
   return value;
 }
 
-export function HotelLayout({ children }: { children: React.ReactNode }) {
+export function HotelLayout({
+  children,
+  activePath,
+  onNavigate,
+}: {
+  children: React.ReactNode;
+  activePath?: string;
+  onNavigate?: (path: string) => void;
+}) {
   const { me, outletId, setOutletId, can } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -36,7 +68,8 @@ export function HotelLayout({ children }: { children: React.ReactNode }) {
   async function branchSaved(id: string) {
     await properties.refetch();
     setOutletId(id);
-    router.push('/dashboard/hotel/settings');
+    if (onNavigate) onNavigate('/dashboard/hotel/settings');
+    else router.push('/dashboard/hotel/settings');
   }
   if (!allowed) return <p>You do not have hotel access. Ask the owner to update your role.</p>;
   if (properties.isLoading) return <p>Loading hotel…</p>;
@@ -129,13 +162,19 @@ export function HotelLayout({ children }: { children: React.ReactNode }) {
       ? [{ href: '/dashboard/hotel/reports', label: 'Reports' }]
       : []),
     ...(can('hotel.manage')
-      ? [{ href: '/dashboard/hotel/settings', label: 'Hotel settings' }]
+      ? [
+          {
+            href: '/dashboard/hotel/settings',
+            label: onNavigate ? 'Rooms & rates' : 'Hotel settings',
+          },
+        ]
       : []),
+    ...(onNavigate && can('staff.manage') ? [{ href: '/dashboard/staff', label: 'Staff' }] : []),
   ];
   return (
     <Context.Provider
       key={property.id}
-      value={{ property, today: hotelToday(property.outlet.timezone) }}
+      value={{ property, today: hotelToday(property.outlet.timezone), navigate: onNavigate }}
     >
       {branchHeader}
       <h1 className="sr-only">{property.name} hotel workspace</h1>
@@ -144,16 +183,28 @@ export function HotelLayout({ children }: { children: React.ReactNode }) {
         <span>Business day · {property.businessDate.slice(0, 10)}</span>
       </div>
       <nav aria-label="Hotel navigation" className="mb-6 flex flex-wrap gap-1 border-b border-line">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={pathname === tab.href ? 'page' : undefined}
-            className={`shrink-0 border-b-2 px-4 py-3 text-sm ${pathname === tab.href ? 'border-ink font-semibold text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}
-          >
-            {tab.label}
-          </Link>
-        ))}
+        {tabs.map((tab) =>
+          onNavigate ? (
+            <button
+              key={tab.href}
+              type="button"
+              onClick={() => onNavigate(tab.href)}
+              aria-current={activePath === tab.href ? 'page' : undefined}
+              className={`shrink-0 border-b-2 px-4 py-3 text-sm ${activePath === tab.href ? 'border-ink font-semibold text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}
+            >
+              {tab.label}
+            </button>
+          ) : (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              aria-current={pathname === tab.href ? 'page' : undefined}
+              className={`shrink-0 border-b-2 px-4 py-3 text-sm ${pathname === tab.href ? 'border-ink font-semibold text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}
+            >
+              {tab.label}
+            </Link>
+          ),
+        )}
       </nav>
       {children}
       {setup}

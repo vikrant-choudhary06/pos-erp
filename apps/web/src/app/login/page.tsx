@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Logo } from '@/components/logo';
 import { Tabs } from '@/components/ui/tabs';
 import { OwnerLogin } from './owner-login';
@@ -15,9 +16,11 @@ type Mode = 'owner' | 'staff';
 
 export default function LoginPage() {
   const router = useRouter();
+  const client = useQueryClient();
   const [mode, setMode] = useState<Mode>('owner');
 
   const onDone = (next: string) => {
+    client.clear();
     router.replace(next === 'onboarding' ? '/onboarding' : '/dashboard');
     router.refresh();
   };

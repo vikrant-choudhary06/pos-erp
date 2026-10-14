@@ -63,6 +63,16 @@ pnpm --filter api test:integration
 
 For browser verification, set `PMS_UI_TEST=1` before the same command. It starts Next.js on a temporary port and uses a real session from the test API. On this Windows computer it uses Chrome; on other environments set `E2E_CHANNEL` to an installed browser channel. It exercises room setup, reservation, check-in, POS room transfer, combined payment and checkout, then captures calendar and mobile housekeeping screenshots under `apps/web/test-results/pms`.
 
+## POS Hotel tab and sign-in recovery — 14 October 2026
+
+POS now offers Restaurant and Hotel tabs. Owners can create hotel branches, add room types/rates and rooms, manage reception, housekeeping and reports, and open staff management within `/pos`. Switching tabs preserves the restaurant order pane and the selected hotel view. Hotel-only staff do not fetch the restaurant menu or subscribe to restaurant events; existing permission checks still apply.
+
+Sign-in requests now have a one-minute network/body deadline, persistent error messages and recovery controls. Successful authentication clears the previous React Query cache before navigation. Account and POS loading failures expose retry controls instead of an indefinite spinner.
+
+All 33 real API/PMS integration checks and all 36 desktop security regressions passed. The Chrome workflow covers a real browser network disconnect and reconnection, rejection of an incorrect random OTP followed by successful authentication, recovery from a previously unauthorized account query, room creation through the POS Hotel tab, restaurant room charging, settlement/checkout, branch creation without leaving `/pos`, and mobile layout checks. Records were persisted in isolated PostgreSQL; no production guest data or mocked API/database responses were used. The browser test origin uses `localhost` consistently with Next's development proxy. Desktop and mobile POS hotel screenshots were inspected.
+
+Live backend and website health endpoints answered successfully, and the live email step reached OTP entry. Live sign-in after OTP remains pending owner verification; local passing tests alone do not establish the cause of the reported production stall.
+
 ## Scope still to build before a full hotel launch
 
 This version does not include room tax-invoice issuance, government guest reporting, identity-document storage, seasonal/occupancy/meal-plan pricing, unassigned room-type bookings, expiring holds, group/corporate accounts, booking-platform connections, direct website booking, guest messaging, housekeeping assignment, cross-outlet hotel charging, or offline hotel operations. Room-charge corrections currently use an authorised guest-account credit; transferred restaurant orders cannot be voided from the POS.

@@ -4,12 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoney } from '@pos/shared';
-import Link from 'next/link';
+import { HotelLink as Link, useHotel } from './hotel-context';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select } from '@/components/ui/field';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { useHotel } from './hotel-context';
 import { HotelRoom, RoomType, roomLabels } from './types';
 
 export function RoomsManager({ housekeeping = false }: { housekeeping?: boolean }) {

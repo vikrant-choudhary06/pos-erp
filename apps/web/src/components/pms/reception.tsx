@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import Link from 'next/link';
+import { HotelLink as Link, useHotel } from './hotel-context';
 import { toast } from 'sonner';
 import { addHotelDays, hotelDate, hotelDateKey } from '@pos/shared';
 import { ArrowDownLeft, ArrowUpRight, BedDouble, Plus, Search } from 'lucide-react';
@@ -12,7 +12,6 @@ import { Sheet } from '@/components/ui/sheet';
 import { api, errorMessage } from '@/lib/api';
 import { newId } from '@/lib/id';
 import { useSession } from '@/lib/session';
-import { useHotel } from './hotel-context';
 import { HotelRoom, Reservation, reservationLabels } from './types';
 import { FolioSheet } from './folio-sheet';
 
@@ -224,7 +223,7 @@ export function Reception({ calendar = false }: { calendar?: boolean }) {
               href="/dashboard/hotel/settings"
               className="mt-3 inline-block font-medium underline underline-offset-4"
             >
-              Open hotel settings
+              Set up rooms & rates
             </Link>
           )}
         </div>
