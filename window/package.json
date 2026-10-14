@@ -1,6 +1,6 @@
 {
   "name": "window",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "productName": "Rizzoto",
   "private": true,
   "description": "Rizzoto for Windows: the counter app plus a local hub the shop's tablets use when the internet is down",
