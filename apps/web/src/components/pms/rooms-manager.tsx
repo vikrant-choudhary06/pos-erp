@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoney } from '@pos/shared';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select } from '@/components/ui/field';
 import { api, errorMessage } from '@/lib/api';
@@ -77,6 +78,54 @@ export function RoomsManager({ housekeeping = false }: { housekeeping?: boolean 
     return <p>You do not have access to this hotel workspace.</p>;
   return (
     <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">
+          {housekeeping ? 'Housekeeping' : 'Rooms & rates'}
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          {housekeeping
+            ? 'Keep room readiness up to date for reception.'
+            : 'Set up room types first, then add room numbers for this branch.'}
+        </p>
+      </div>
+      {!housekeeping && (
+        <ol
+          aria-label="Hotel setup progress"
+          className="grid gap-3 rounded-xl border border-line bg-card p-4 text-sm sm:grid-cols-3"
+        >
+          <li>
+            <strong className="block">1. Room types & rates</strong>
+            <span className="text-xs text-ink-soft">
+              {types.data?.length
+                ? `${types.data.length} room types added`
+                : 'Add a type with capacity and nightly rate'}
+            </span>
+          </li>
+          <li>
+            <strong className="block">2. Room numbers</strong>
+            <span className="text-xs text-ink-soft">
+              {rooms.data?.length
+                ? `${rooms.data.length} rooms added`
+                : 'Choose a type for each room'}
+            </span>
+          </li>
+          <li>
+            <strong className="block">3. Staff access</strong>
+            {can('staff.manage') ? (
+              <Link href="/dashboard/staff" className="text-xs underline underline-offset-4">
+                Assign branch staff and roles
+              </Link>
+            ) : (
+              <span className="text-xs text-ink-soft">Ask the owner to assign branch staff</span>
+            )}
+          </li>
+        </ol>
+      )}
+      {(rooms.isError || (!housekeeping && types.isError)) && (
+        <p role="alert" className="text-sm text-danger">
+          {errorMessage(rooms.error || types.error)}
+        </p>
+      )}
       {!housekeeping && (
         <div className="grid gap-6 xl:grid-cols-2">
           <form

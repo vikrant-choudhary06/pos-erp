@@ -96,17 +96,29 @@ export function FolioSheet({ id, onClose }: { id: string; onClose: () => void })
             {stay.arrival.slice(0, 10)} → {stay.departure.slice(0, 10)} · {stay.guests} guests ·{' '}
             {stay.guest.phone}
           </p>
-          <div className="rounded-xl bg-paper p-4 text-sm">
-            <p>
-              Posted balance: <strong>{formatMoney(stay.balance)}</strong>
+          <div className="rounded-xl bg-paper p-5 text-sm">
+            <p className="text-xs text-ink-soft">
+              {stay.status === 'CHECKED_IN'
+                ? 'Balance if checking out today'
+                : 'Posted account balance'}
             </p>
-            <p>Estimated balance for the booked stay: {formatMoney(stay.estimatedBalance)}</p>
+            <strong className="mt-1 block text-3xl tracking-tight tabular-nums">
+              {formatMoney(stay.status === 'CHECKED_IN' ? stay.checkoutBalance : stay.balance)}
+            </strong>
             {stay.status === 'CHECKED_IN' && (
-              <p>
-                Balance if checking out today: <strong>{formatMoney(stay.checkoutBalance)}</strong>{' '}
-                · minimum one room night
+              <p className="mt-1 text-xs text-ink-soft">
+                Includes room nights used, with a minimum of one night.
               </p>
             )}
+            <details className="mt-3 border-t border-line pt-3">
+              <summary className="cursor-pointer text-xs text-ink-soft">
+                View balance breakdown
+              </summary>
+              <div className="mt-2 space-y-1 text-xs">
+                <p>Posted balance: {formatMoney(stay.balance)}</p>
+                <p>Estimated balance for the booked stay: {formatMoney(stay.estimatedBalance)}</p>
+              </div>
+            </details>
           </div>
           {can('hotel.frontdesk') && (
             <div className="flex flex-wrap gap-2">
@@ -115,28 +127,35 @@ export function FolioSheet({ id, onClose }: { id: string; onClose: () => void })
                   <Button loading={busy} onClick={() => mutate('/check-in')}>
                     Check in
                   </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => {
-                      const reason = window.prompt('Cancellation reason');
-                      if (reason?.trim())
-                        void mutate('/cancel', { status: 'CANCELLED', reason: reason.trim() });
-                    }}
-                  >
-                    Cancel booking
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => {
-                      const reason = window.prompt('No-show reason');
-                      if (reason?.trim())
-                        void mutate('/cancel', { status: 'NO_SHOW', reason: reason.trim() });
-                    }}
-                  >
-                    Mark no-show
-                  </Button>
+                  <details className="self-center text-sm">
+                    <summary className="cursor-pointer rounded-lg px-3 py-2 text-ink-soft">
+                      More booking actions
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          const reason = window.prompt('Cancellation reason');
+                          if (reason?.trim())
+                            void mutate('/cancel', { status: 'CANCELLED', reason: reason.trim() });
+                        }}
+                      >
+                        Cancel booking
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => {
+                          const reason = window.prompt('No-show reason');
+                          if (reason?.trim())
+                            void mutate('/cancel', { status: 'NO_SHOW', reason: reason.trim() });
+                        }}
+                      >
+                        Mark no-show
+                      </Button>
+                    </div>
+                  </details>
                 </>
               )}
               {stay.status === 'CHECKED_IN' && can('hotel.billing') && (
@@ -257,46 +276,51 @@ export function FolioSheet({ id, onClose }: { id: string; onClose: () => void })
             </form>
           )}
           {active && can('hotel.frontdesk') && (
-            <form onSubmit={change} className="space-y-4 rounded-xl border border-line p-4">
-              <h2 className="font-semibold">Move room / extend stay</h2>
-              <Field label="Room">
-                {(fieldId) => (
-                  <Select id={fieldId} name="roomId" defaultValue={stay.room.id}>
-                    {rooms.data?.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        {room.number} · {room.roomType.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-              <Field label="Departure">
-                {(fieldId) => (
-                  <Input
-                    id={fieldId}
-                    name="departure"
-                    type="date"
-                    min={stay.departure.slice(0, 10)}
-                    defaultValue={stay.departure.slice(0, 10)}
-                    required
-                  />
-                )}
-              </Field>
-              <label className="flex items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  name="allowRoomCharges"
-                  defaultChecked={stay.allowRoomCharges}
-                />{' '}
-                Allow restaurant charges
-              </label>
-              <p className="text-xs text-ink-soft">
-                The agreed nightly rate is retained when moving rooms or extending the stay.
-              </p>
-              <Button type="submit" loading={busy}>
-                Update stay
-              </Button>
-            </form>
+            <details className="rounded-xl border border-line p-4">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Change room or extend stay
+              </summary>
+              <form onSubmit={change} className="space-y-4 rounded-xl border border-line p-4">
+                <h2 className="font-semibold">Move room / extend stay</h2>
+                <Field label="Room">
+                  {(fieldId) => (
+                    <Select id={fieldId} name="roomId" defaultValue={stay.room.id}>
+                      {rooms.data?.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.number} · {room.roomType.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+                <Field label="Departure">
+                  {(fieldId) => (
+                    <Input
+                      id={fieldId}
+                      name="departure"
+                      type="date"
+                      min={stay.departure.slice(0, 10)}
+                      defaultValue={stay.departure.slice(0, 10)}
+                      required
+                    />
+                  )}
+                </Field>
+                <label className="flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    name="allowRoomCharges"
+                    defaultChecked={stay.allowRoomCharges}
+                  />{' '}
+                  Allow restaurant charges
+                </label>
+                <p className="text-xs text-ink-soft">
+                  The agreed nightly rate is retained when moving rooms or extending the stay.
+                </p>
+                <Button type="submit" loading={busy}>
+                  Update stay
+                </Button>
+              </form>
+            </details>
           )}
         </div>
       )}

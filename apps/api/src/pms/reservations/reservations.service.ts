@@ -30,7 +30,12 @@ export class HotelReservationsService {
     return this.prisma.hotelReservation.findMany({
       where: {
         propertyId,
-        OR: [{ arrival: { lt: departure }, departure: { gt: arrival } }, { status: 'CHECKED_IN' }],
+        OR: [
+          { arrival: { lt: departure }, departure: { gt: arrival } },
+          { status: 'CHECKED_IN' },
+          // Keep departures visible on their checkout date, including same-day stays.
+          { status: 'CHECKED_OUT', departure: { gte: arrival, lt: departure } },
+        ],
       },
       include: { guest: true, room: true },
       orderBy: { arrival: 'asc' },

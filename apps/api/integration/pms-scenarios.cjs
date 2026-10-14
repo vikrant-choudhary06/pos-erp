@@ -260,6 +260,8 @@ module.exports = async function pmsScenarios(
       assert.equal(current.balance, 0);
       assert.equal(current.entries.filter((entry) => entry.kind === 'ROOM').length, 1);
       assert.equal((await db.hotelRoom.findUniqueOrThrow({ where: { id: r.id } })).status, 'DIRTY');
+      const departures = (await request(owner, 'GET', `${root}/reservations?from=${day(1)}&to=${day(2)}`)).data;
+      assert.ok(departures.some((item) => item.id === stay.id), 'Completed stays remain visible on their departure date');
     },
   );
 

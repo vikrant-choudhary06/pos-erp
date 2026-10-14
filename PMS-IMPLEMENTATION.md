@@ -4,10 +4,10 @@ Implemented on 13 October 2026. This is a hotel operations module in the existin
 
 ## Available workflows
 
-- Enable a hotel for an existing outlet from Settings → Hotel module. Access follows existing business/outlet assignments. Restaurant-only businesses have no Hotel sidebar entry until a hotel is enabled.
+- Open Settings → Hotel module, then Add hotel branch. Enable a hotel at an existing location, or owners can create a new location with name, branch code, city and state directly in this flow. Access follows existing business/outlet assignments. Restaurant-only businesses have no Hotel sidebar entry until a hotel is enabled.
 - Create room types with capacity, nightly price before tax and an explicitly configured tax percentage. Add numbered rooms and floors. Rate changes apply to new bookings; existing bookings retain their agreed rate and tax snapshot.
 - Reserve a specific room for 1–365 nights. Dates use the property's timezone and half-open intervals: departure day can be the next guest's arrival day. Simultaneous overlapping reservations are serialized by a property row lock. All PMS writes must go through the application API.
-- Reception and a 14-day room calendar display bookings and checked-in guests. Overdue checked-in stays remain visible so reception can extend or resolve them.
+- Reception groups arrivals, current stays, departures due/overdue and all bookings, with guest/phone/room search, date selection and a Today shortcut. All bookings covers a 31-day window; overdue checked-in stays remain visible. The room calendar displays 14 days. Completed stays also remain visible when searching their departure date.
 - Check in on the arrival day after housekeeping marks the room ready. Move a guest to a ready room or extend a stay when no reservation conflicts. Room moves keep the agreed rate and dirty the previous room.
 - Record deposits/payments, extra charges, manager-authorised credits and refunds. Payment/refund entries record money already moved; they do not initiate or verify bank transactions. Repeated identical request IDs do not create duplicate entries.
 - Charge an unpaid printed restaurant bill to a checked-in guest from POS → More → Charge to room. The guest must allow room charging. The restaurant order becomes `CHARGED`, ingredients are deducted once, and no POS payment is created. Guest checkout and room charging share the same property lock.
@@ -30,6 +30,12 @@ Owners have full access. New businesses receive Hotel Manager, Receptionist, Cle
 
 Reception needs `hotel.view`, `hotel.frontdesk` and `hotel.billing`. Housekeeping needs `hotel.housekeeping`. Hotel setup and credits/refunds require `hotel.manage`; daily closing requires `hotel.close_day`. Reports also require `reports.view`. POS room charging requires `bill.settle` and `hotel.billing`; the guest-selection UI also requires `hotel.view`.
 
+## Hotel workspace usability — 14 October 2026
+
+The hotel header provides a branch selector and branch setup without leaving the hotel workspace. Reception separates daily work into tabs with counts and search. Booking forms show essential fields first, with email and notes under optional details. Guest accounts emphasise the checkout balance; balance breakdown, cancellation/no-show actions and room changes are expandable. Restaurant navigation is collapsed while using hotel screens. Room setup includes guidance for types/rates, room numbers and staff assignments. Reception tabs support arrow keys, Home and End; mobile navigation wraps instead of hiding labels.
+
+Branch setup uses the existing location and hotel APIs. If creating the location succeeds but enabling the hotel fails, the open form retains the saved location for retry; an unfinished location also remains available to enable later. The existing outlet/branch permission checks still apply. This phase does not add a consolidated multi-hotel owner dashboard or change hotel accounting rules.
+
 ## Database and operation
 
 Apply `20261013170000_hotel_pms` before starting the updated API. Build `@pos/shared` and regenerate Prisma. Deploy API and web together because both recognise the new `CHARGED` order status. Older desktop/offline hub builds do not provide hotel operations.
@@ -45,6 +51,8 @@ Desktop 0.1.2 was built with the current security fixes and signed using the loc
 Completed checks: all 17 existing security scenarios and 12 PMS backend scenarios passed (the Node runner reports 30 passing tests including the PMS parent test). Workspace TypeScript checks, API build and web production build passed. A separate real Chrome run completed room setup → reservation → check-in → POS room transfer → combined payment → checkout. Desktop calendar and mobile housekeeping screenshots were visually inspected.
 
 Hotel staff role follow-up: all 32 API integration tests passed, including default-role permissions through real staff logins and migration reruns against PostgreSQL. Missing roles were added without duplicates and an existing customised Receptionist role remained unchanged. Workspace TypeScript checks also passed.
+
+UI simplification follow-up: all 33 integration checks passed with real Chrome, Nest and PostgreSQL. The browser workflow covers room setup, booking/check-in, actual POS room charging, payment/checkout, search, mobile overflow, creating an additional hotel branch, switching branches and keyboard tabs. A backend assertion verifies completed stays remain visible on their departure date. Updated desktop/mobile screenshots were visually inspected; workspace TypeScript checks and the web production build passed. These checks used isolated test records; no deployment or production-data change was performed.
 
 The integration suite starts the actual Nest API and uses PostgreSQL. It creates real persisted test businesses, rooms, guests, reservations, payments and restaurant orders. No API, database or payment-service mocks are used; these are test records, not production customer data.
 

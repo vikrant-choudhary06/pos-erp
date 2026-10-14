@@ -144,9 +144,16 @@ function SidebarContent() {
   });
 
   const hotelNav: NavItem[] = hotels.data?.length
-    ? [{ href: '/dashboard/hotel', label: 'Hotel', icon: Hotel }]
+    ? [
+        {
+          href: can('hotel.view') ? '/dashboard/hotel' : '/dashboard/hotel/housekeeping',
+          label: 'Hotel',
+          icon: Hotel,
+        },
+      ]
     : [];
-  const groups = [...NAV, hotelNav]
+  const hotelMode = pathname.startsWith('/dashboard/hotel');
+  const groups = (hotelMode ? [hotelNav, NAV[3]] : [NAV[0], hotelNav, ...NAV.slice(1)])
     .map((group) => group.filter((item) => !item.permission || can(item.permission)))
     .filter((group) => group.length);
   const isActive = (href: string) =>
@@ -166,7 +173,11 @@ function SidebarContent() {
       </div>
 
       <div className="mt-6">
-        <OutletSwitcher />
+        {hotelMode ? (
+          <p className="truncate px-2 text-xs text-ink-soft">{me.business.name}</p>
+        ) : (
+          <OutletSwitcher />
+        )}
       </div>
 
       <nav className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
@@ -197,6 +208,27 @@ function SidebarContent() {
             })}
           </div>
         ))}
+        {hotelMode && (can('order.take') || can('kitchen.view') || can('menu.manage')) && (
+          <details className="border-t border-line pt-3 text-sm">
+            <summary className="cursor-pointer px-2.5 py-2 text-ink-soft">
+              Restaurant workspace
+            </summary>
+            <div className="mt-1 space-y-1">
+              {NAV.slice(0, 3)
+                .flat()
+                .filter((item) => !item.permission || can(item.permission))
+                .map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block rounded-lg px-3 py-2 text-ink-soft hover:bg-ink/5 hover:text-ink"
+                  >
+                    {item.href === '/dashboard' ? 'Restaurant overview' : item.label}
+                  </Link>
+                ))}
+            </div>
+          </details>
+        )}
       </nav>
 
       <div className="mt-4 border-t border-line pt-4">
