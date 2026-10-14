@@ -1,7 +1,7 @@
 'use client';
 
 import type { Permission } from '@pos/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import {
@@ -137,23 +137,21 @@ function SidebarContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { me, can } = useSession();
-  const hotels = useQuery({
-    queryKey: ['hotel-properties', me.business.id],
-    queryFn: () => api<{ id: string }[]>('/pms/properties'),
-    enabled: can('hotel.view') || can('hotel.housekeeping') || can('hotel.manage'),
-  });
-
-  const hotelNav: NavItem[] = hotels.data?.length
+  const hotelAccess = can('hotel.view') || can('hotel.housekeeping') || can('hotel.manage');
+  const hotelNav: NavItem[] = hotelAccess
     ? [
         {
-          href: can('hotel.view') ? '/dashboard/hotel' : '/dashboard/hotel/housekeeping',
+          href: can('hotel.view')
+            ? '/dashboard/hotel'
+            : can('hotel.manage')
+              ? '/dashboard/hotel/settings'
+              : '/dashboard/hotel/housekeeping',
           label: 'Hotel',
           icon: Hotel,
         },
       ]
     : [];
-  const hotelMode = pathname.startsWith('/dashboard/hotel');
-  const groups = (hotelMode ? [hotelNav, NAV[3]] : [NAV[0], hotelNav, ...NAV.slice(1)])
+  const groups = [NAV[0], [...NAV[1], ...hotelNav], ...NAV.slice(2)]
     .map((group) => group.filter((item) => !item.permission || can(item.permission)))
     .filter((group) => group.length);
   const isActive = (href: string) =>
@@ -173,14 +171,13 @@ function SidebarContent() {
       </div>
 
       <div className="mt-6">
-        {hotelMode ? (
-          <p className="truncate px-2 text-xs text-ink-soft">{me.business.name}</p>
-        ) : (
-          <OutletSwitcher />
-        )}
+        <OutletSwitcher />
       </div>
 
-      <nav className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
+      <nav
+        aria-label="Dashboard navigation"
+        className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto"
+      >
         {groups.map((group, i) => (
           <div key={i} className={cn('space-y-0.5', i > 0 && 'border-t border-line pt-3')}>
             {group.map(({ href, label, icon: Icon }) => {
@@ -189,6 +186,7 @@ function SidebarContent() {
                 <Link
                   key={href}
                   href={href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
                     'relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors',
                     active ? 'text-ink' : 'text-ink-soft hover:text-ink',
@@ -208,27 +206,6 @@ function SidebarContent() {
             })}
           </div>
         ))}
-        {hotelMode && (can('order.take') || can('kitchen.view') || can('menu.manage')) && (
-          <details className="border-t border-line pt-3 text-sm">
-            <summary className="cursor-pointer px-2.5 py-2 text-ink-soft">
-              Restaurant workspace
-            </summary>
-            <div className="mt-1 space-y-1">
-              {NAV.slice(0, 3)
-                .flat()
-                .filter((item) => !item.permission || can(item.permission))
-                .map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="block rounded-lg px-3 py-2 text-ink-soft hover:bg-ink/5 hover:text-ink"
-                  >
-                    {item.href === '/dashboard' ? 'Restaurant overview' : item.label}
-                  </Link>
-                ))}
-            </div>
-          </details>
-        )}
       </nav>
 
       <div className="mt-4 border-t border-line pt-4">

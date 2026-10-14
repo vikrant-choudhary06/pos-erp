@@ -73,6 +73,12 @@ All 33 real API/PMS integration checks and all 36 desktop security regressions p
 
 Live backend and website health endpoints answered successfully, and the live email step reached OTP entry. Live sign-in after OTP remains pending owner verification; local passing tests alone do not establish the cause of the reported production stall.
 
+## Dashboard navigation follow-up — 14 October 2026
+
+Hotel remains under the existing `/dashboard/hotel` routes and uses the same sidebar as Orders, Reports and Menu. Opening Hotel no longer collapses the other dashboard sections into a separate restaurant workspace. The Hotel entry is visible to authorized users before a branch has been configured. The embedded POS Hotel flow is retained; no legacy route was deleted.
+
+All 16 PMS/API/browser checks passed against isolated PostgreSQL and Chrome. The browser navigated from Orders through the Hotel sidebar link, checked `/dashboard/hotel` and the active link, refreshed the page, verified the other dashboard links remain visible, and navigated to Menu and back. Existing booking, payment, checkout, branch setup and mobile checks also passed. Web TypeScript and diff checks passed.
+
 ## Scope still to build before a full hotel launch
 
 This version does not include room tax-invoice issuance, government guest reporting, identity-document storage, seasonal/occupancy/meal-plan pricing, unassigned room-type bookings, expiring holds, group/corporate accounts, booking-platform connections, direct website booking, guest messaging, housekeeping assignment, cross-outlet hotel charging, or offline hotel operations. Room-charge corrections currently use an authorised guest-account credit; transferred restaurant orders cannot be voided from the POS.

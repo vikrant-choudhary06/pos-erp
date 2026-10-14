@@ -139,7 +139,23 @@ module.exports = async function browserScenario({ api, webOrigin, owner, billedO
     await page.getByRole('tab', { name: 'Hotel', exact: true }).click();
     await expect(page.getByRole('columnheader', { name: 'Room', exact: true })).toBeVisible();
     assert.equal(new URL(page.url()).pathname, '/pos');
-    await page.goto('/dashboard/hotel');
+    await page.goto('/dashboard/orders');
+    const dashboardNav = page.getByRole('navigation', { name: 'Dashboard navigation' });
+    await dashboardNav.getByRole('link', { name: 'Hotel', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/hotel$/);
+    await expect(dashboardNav.getByRole('link', { name: 'Hotel', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    for (const label of ['Overview', 'Orders', 'Menu', 'Reports']) {
+      await expect(dashboardNav.getByRole('link', { name: label, exact: true })).toBeVisible();
+    }
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Reception', exact: true })).toBeVisible();
+    await dashboardNav.getByRole('link', { name: 'Menu', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/menu$/);
+    await dashboardNav.getByRole('link', { name: 'Hotel', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/hotel$/);
     const originalBranch = await page.getByLabel('Hotel branch', { exact: true }).inputValue();
     await page.getByRole('button', { name: 'New booking', exact: true }).click();
     await page.getByLabel('Guest name').fill(guestName);
