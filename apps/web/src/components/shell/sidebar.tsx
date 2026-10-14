@@ -176,7 +176,7 @@ function SidebarContent() {
 
       <nav
         aria-label="Dashboard navigation"
-        className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto"
+        className="no-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto"
       >
         {groups.map((group, i) => (
           <div key={i} className={cn('space-y-0.5', i > 0 && 'border-t border-line pt-3')}>
