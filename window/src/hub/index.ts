@@ -4,6 +4,7 @@ import https from 'node:https';
 import type { Protection } from './protection';
 import { businessDate, financialYear, type Kot, type Order } from '@pos/shared';
 import { Cloud } from './cloud';
+import { startHealthPing } from './health-ping';
 import { LocalEvents } from './events';
 import {
   hash,
@@ -479,6 +480,7 @@ export async function startHub(options: HubOptions) {
     throw err;
   }
   const port = (server.address() as { port: number }).port;
+  const healthPing = startHealthPing(cloud, { log });
   const timer = setInterval(() => void tick(), POLL);
   void tick();
   log(`Hub on port ${port}, cloud ${cloud.origin}`);
@@ -493,6 +495,8 @@ export async function startHub(options: HubOptions) {
     /** For testing and the "work offline" switch in settings. */
     setForcedOffline(value: boolean) {
       forced = value;
+      if (value) healthPing.pause();
+      else healthPing.resume();
       changed();
       if (!value) void tick();
     },
@@ -509,6 +513,7 @@ export async function startHub(options: HubOptions) {
     },
     async stop() {
       stopped = true;
+      healthPing.stop();
       clearInterval(timer);
       events.stop();
       for (const s of streams) s.destroy();

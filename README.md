@@ -75,6 +75,19 @@ https://your-domain` runs only the hub (requires the encryption key below).
 
 ### Offline security and hub setup
 
+While the desktop app or headless hub is running, it sends an unauthenticated
+`GET /api/health` through the configured cloud website immediately, then every five
+minutes after a successful check. Requests have a 20-second total deadline, including
+the response body. Network errors and server failures get one retry after 10 seconds,
+then return to the normal interval. Rate limits wait at least five minutes and honour
+`Retry-After`; the same header is honoured for server failures. Requests never overlap,
+never follow redirects and do not send session/device cookies. TLS checks stay enabled.
+The response must be bounded JSON with `status: "ok"`; HTML loading pages are failures.
+Failures and recovery are logged once per outage in `hub.log`, without popups or
+changes to billing state. Forced-offline mode pauses this loop; hub shutdown cancels it.
+This can help keep a test backend active while the PC/app runs, but is not an uptime
+guarantee and cannot run when the PC is off or the app is quit.
+
 - The cloud grants at most 12 hours of offline access, capped by the session's own expiry.
   Offline reads do not renew it. Sign-out blocks local access immediately and requires a
   fresh online sign-in. Remote account changes take effect when reconnected or when this

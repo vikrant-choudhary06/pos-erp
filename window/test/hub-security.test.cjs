@@ -149,6 +149,13 @@ test(
     const leaked = [];
     const cloudSockets = new Set();
     const cloudServer = http.createServer((req, res) => {
+      if (req.url === '/api/health') {
+        // The hub's background probe is separate from client-forwarded traffic.
+        assert.equal(req.method, 'GET');
+        assert.equal(req.headers.cookie, undefined);
+        assert.equal(req.headers.authorization, undefined);
+        return res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+      }
       seen.push({ url: req.url, cookie: req.headers.cookie });
       if (req.url === '/redirect') {
         res.writeHead(302, { location: `http://127.0.0.1:${otherPort}/capture` }).end();

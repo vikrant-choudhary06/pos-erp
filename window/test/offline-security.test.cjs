@@ -373,6 +373,12 @@ test(
     const upstream = http.createServer((req, res) => {
       req.resume();
       if (!online) return res.writeHead(503).end();
+      if (req.url === '/api/health') {
+        assert.equal(req.method, 'GET');
+        assert.equal(req.headers.cookie, undefined);
+        assert.equal(req.headers.authorization, undefined);
+        return res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+      }
       seen.push({ path: req.url, cookie: req.headers.cookie });
       res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
     });
